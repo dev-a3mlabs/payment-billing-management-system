@@ -1,0 +1,53 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  super_admin_main
+  super_admin
+  admin
+  agent
+  user
+}
+
+enum UserStatus {
+  active
+  suspended
+  deleted
+}
+
+model User {
+  id                 Int        @id @default(autoincrement())
+  uuid               String     @unique @default(uuid())
+  username           String     @unique
+  email              String     @unique
+  passwordHash       String     @map("password_hash")
+  role               Role
+  status             UserStatus @default(active)
+  mustChangePassword Boolean    @default(true) @map("must_change_password")
+
+  firstName    String  @map("first_name")
+  lastName     String? @map("last_name")
+  countryCode  String? @map("country_code")
+  mobileNumber String? @unique @map("mobile_number")
+
+  createdById  Int?   @map("created_by_id")
+  createdBy    User?  @relation("UserCreatedBy", fields: [createdById], references: [id])
+  createdUsers User[] @relation("UserCreatedBy")
+
+  tempPasswordUsedAt DateTime? @map("temp_password_used_at")
+  passwordChangedAt  DateTime? @map("password_changed_at")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@index([role])
+  @@index([createdById])
+  @@map("users")
+}
