@@ -8,8 +8,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('1d'),
-  JWT_TEMP_SECRET: z.string().min(32, 'JWT_TEMP_SECRET must be at least 32 characters'),
-  JWT_TEMP_EXPIRES_IN: z.string().default('15m'),
+  REFRESH_TOKEN_EXPIRES_DAYS: z.coerce.number().int().positive().default(15),
 });
 
 const parsed = envSchema.safeParse(process.env);

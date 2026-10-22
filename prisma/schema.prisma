@@ -9,7 +9,6 @@ datasource db {
 }
 
 enum Role {
-  super_admin_main
   super_admin
   admin
   agent
@@ -26,13 +25,13 @@ model User {
   id                 Int        @id @default(autoincrement())
   uuid               String     @unique @default(uuid())
   username           String     @unique
-  email              String     @unique
+  email              String?    @unique
   passwordHash       String     @map("password_hash")
   role               Role
   status             UserStatus @default(active)
   mustChangePassword Boolean    @default(true) @map("must_change_password")
 
-  firstName    String  @map("first_name")
+  firstName    String? @map("first_name")
   lastName     String? @map("last_name")
   countryCode  String? @map("country_code")
   mobileNumber String? @unique @map("mobile_number")
@@ -40,6 +39,12 @@ model User {
   createdById  Int?   @map("created_by_id")
   createdBy    User?  @relation("UserCreatedBy", fields: [createdById], references: [id])
   createdUsers User[] @relation("UserCreatedBy")
+
+  refreshTokens RefreshToken[]
+
+  accessValues      AccessUserValue[] @relation("AccessUserValueUser")
+  accessUserUpdates AccessUserValue[] @relation("AccessUserValueUpdatedBy")
+  accessRoleUpdates AccessRoleValue[]
 
   tempPasswordUsedAt DateTime? @map("temp_password_used_at")
   passwordChangedAt  DateTime? @map("password_changed_at")
@@ -50,4 +55,79 @@ model User {
   @@index([role])
   @@index([createdById])
   @@map("users")
+}
+
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+enum AccessKind {
+  permission
+  limit
+  policy
+}
+
+enum AccessValueType {
+  bool
+  int
+  string
+}
+
+model AccessKey {
+  id           Int             @id @default(autoincrement())
+  key          String          @unique @db.VarChar(100)
+  module       String          @db.VarChar(50)
+  kind         AccessKind
+  valueType    AccessValueType @map("value_type")
+  defaultValue String          @map("default_value") @db.VarChar(255)
+  description  String?
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  roleValues AccessRoleValue[]
+  userValues AccessUserValue[]
+
+  @@index([module])
+  @@map("access_keys")
+}
+
+model AccessRoleValue {
+  role        Role
+  accessKeyId Int       @map("access_key_id")
+  accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  value       String    @db.VarChar(255)
+  updatedById Int       @map("updated_by_id")
+  updatedBy   User      @relation(fields: [updatedById], references: [id])
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@id([role, accessKeyId])
+  @@index([accessKeyId])
+  @@index([updatedById])
+  @@map("access_role_values")
+}
+
+model AccessUserValue {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  user        User      @relation("AccessUserValueUser", fields: [userId], references: [id], onDelete: Cascade)
+  accessKeyId Int       @map("access_key_id")
+  accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  value       String    @db.VarChar(255)
+  updatedById Int       @map("updated_by_id")
+  updatedBy   User      @relation("AccessUserValueUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, accessKeyId])
+  @@index([accessKeyId])
+  @@index([updatedById])
+  @@map("access_user_values")
 }

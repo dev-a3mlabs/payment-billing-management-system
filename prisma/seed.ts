@@ -1,7 +1,8 @@
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
+import { ACCESS_KEYS } from '../src/config/access-keys.js';
 import { prisma } from '../src/db/prisma.js';
-import { Role } from '../src/generated/prisma/enums.js';
+import { AccessKind, AccessValueType, Role } from '../src/generated/prisma/enums.js';
 import { logger } from '../src/utils/logger.js';
 
 const seedEnvSchema = z.object({
@@ -11,13 +12,7 @@ const seedEnvSchema = z.object({
   SUPER_ADMIN_FIRST_NAME: z.string().min(1, 'SUPER_ADMIN_FIRST_NAME is required'),
 });
 
-const seedSuperAdminMain = async () => {
-  const existing = await prisma.user.findFirst({ where: { role: Role.super_admin_main } });
-  if (existing) {
-    logger.info(`super_admin_main already exists (${existing.username}), skipping`);
-    return;
-  }
-
+const seedSuperAdmin = async () => {
   const parsed = seedEnvSchema.safeParse(process.env);
   if (!parsed.success) {
     logger.error('Invalid seed environment variables:', z.flattenError(parsed.error).fieldErrors);
@@ -26,23 +21,45 @@ const seedSuperAdminMain = async () => {
   }
   const seedEnv = parsed.data;
 
-  const passwordHash = await bcrypt.hash(seedEnv.SUPER_ADMIN_PASSWORD, 10);
+  let user = await prisma.user.findUnique({ where: { username: seedEnv.SUPER_ADMIN_USERNAME } });
+  if (user) {
+    logger.info(`Super admin already exists (${user.username}), skipping create`);
+  } else {
+    user = await prisma.user.create({
+      data: {
+        username: seedEnv.SUPER_ADMIN_USERNAME,
+        email: seedEnv.SUPER_ADMIN_EMAIL,
+        passwordHash: await bcrypt.hash(seedEnv.SUPER_ADMIN_PASSWORD, 10),
+        role: Role.super_admin,
+        firstName: seedEnv.SUPER_ADMIN_FIRST_NAME,
+        mustChangePassword: false,
+      },
+    });
+    logger.info(`Super admin created (${user.username})`);
+  }
 
-  const user = await prisma.user.create({
-    data: {
-      username: seedEnv.SUPER_ADMIN_USERNAME,
-      email: seedEnv.SUPER_ADMIN_EMAIL,
-      passwordHash,
-      role: Role.super_admin_main,
-      firstName: seedEnv.SUPER_ADMIN_FIRST_NAME,
-      mustChangePassword: true,
+  const accessKey = await prisma.accessKey.upsert({
+    where: { key: ACCESS_KEYS.superAdminCreate },
+    update: {},
+    create: {
+      key: ACCESS_KEYS.superAdminCreate,
+      module: 'super_admin',
+      kind: AccessKind.permission,
+      valueType: AccessValueType.bool,
+      defaultValue: 'false',
+      description: 'Create super admins',
     },
   });
 
-  logger.info(`super_admin_main created (${user.username})`);
+  await prisma.accessUserValue.upsert({
+    where: { userId_accessKeyId: { userId: user.id, accessKeyId: accessKey.id } },
+    update: { value: 'true' },
+    create: { userId: user.id, accessKeyId: accessKey.id, value: 'true', updatedById: user.id },
+  });
+  logger.info(`Granted ${ACCESS_KEYS.superAdminCreate} to ${user.username}`);
 };
 
-seedSuperAdminMain()
+seedSuperAdmin()
   .catch((err) => {
     logger.error('Seed failed:', err);
     process.exitCode = 1;
