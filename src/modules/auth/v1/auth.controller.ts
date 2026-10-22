@@ -1,10 +1,11 @@
 import type { Request, Response } from 'express';
 import type { Portal } from '../../../config/portals.js';
+import { getClientInfo } from '../../../utils/request.js';
 import { authService } from '../auth.service.js';
 
 // Each portal's router mounts these through authRoutesFor(portal).
 export const loginFor = (portal: Portal) => async (req: Request, res: Response) => {
-  const data = await authService.login(req.body, portal);
+  const data = await authService.login(req.body, portal, getClientInfo(req));
 
   res.json({
     success: true,
@@ -14,7 +15,7 @@ export const loginFor = (portal: Portal) => async (req: Request, res: Response) 
 };
 
 export const refreshFor = (portal: Portal) => async (req: Request, res: Response) => {
-  const data = await authService.refresh(req.body.refreshToken, portal);
+  const data = await authService.refresh(req.body.refreshToken, portal, getClientInfo(req));
 
   res.json({ success: true, message: 'Token refreshed', data });
 };

@@ -10,12 +10,13 @@ export type AuthUser = {
   uuid: string;
   role: Role;
   portal: Portal;
+  sessionId: number;
 };
 
 // Request on routes behind authenticate(), where user is always set.
 export type AuthRequest = Request & { user: AuthUser };
 
-// Verifies the access token and that the user still belongs to this portal.
+// Verifies the access token, its session, and that the user still belongs to this portal.
 export const authenticate = (portal: Portal) => async (req: Request, _res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
@@ -36,16 +37,24 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
     throw ApiError.forbidden();
   }
 
-  // The token can be outdated, so check the current role and status in the DB.
-  const user = await authRepository.findUserByUuid(payload.sub);
-  if (!user || user.status !== UserStatus.active) {
+  // The token can outlive a logout or a role change, so check the session and user in the DB.
+  const session = await authRepository.findSessionByUuid(payload.sid);
+  if (
+    !session ||
+    session.revokedAt ||
+    session.expiresAt < new Date() ||
+    session.user.uuid !== payload.sub ||
+    session.user.status !== UserStatus.active
+  ) {
     throw ApiError.unauthorized('Invalid or expired access token');
   }
-  if (ROLE_PORTAL[user.role] !== portal) {
+
+  const { user } = session;
+  if (session.portal !== portal || ROLE_PORTAL[user.role] !== portal) {
     throw ApiError.forbidden();
   }
 
-  (req as AuthRequest).user = { id: user.id, uuid: user.uuid, role: user.role, portal };
+  (req as AuthRequest).user = { id: user.id, uuid: user.uuid, role: user.role, portal, sessionId: session.id };
   next();
 };
 

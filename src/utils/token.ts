@@ -8,6 +8,7 @@ export type AccessTokenPayload = {
   sub: string; // user uuid
   role: Role;
   portal: Portal;
+  sid: string; // session uuid
   type: 'access';
 };
 
