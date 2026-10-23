@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { sendSuccess } from '../utils/response.js';
 import superAdminRoutes from '../modules/super-admin/v1/super-admin.index.js';
 import adminRoutes from '../modules/admin/v1/admin.index.js';
 import agentRoutes from '../modules/agent/v1/agent.index.js';
@@ -7,7 +8,7 @@ const router = Router();
 
 // Public
 router.get('/hello', (_req, res) => {
-  res.json({ success: true, message: 'Hello World' });
+  sendSuccess(res, { message: 'Hello World' });
 });
 
 router.use('/super-admin', superAdminRoutes);

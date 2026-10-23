@@ -1,17 +1,34 @@
 import { prisma } from '../../db/prisma.js';
-import type { SessionRevokeReason } from '../../config/session-revoke-reasons.js';
+import { SESSION_REVOKE_REASONS, type SessionRevokeReason } from '../../config/session-revoke-reasons.js';
 
 export const authRepository = {
   findUserByUsername: (username: string) => prisma.user.findUnique({ where: { username } }),
+
+  findPasswordHash: async (userId: number) =>
+    (await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } }))?.passwordHash,
+
+  // Saves the new password and logs out every other device in one transaction.
+  updatePassword: async (userId: number, passwordHash: string, currentSessionId: number) => {
+    const now = new Date();
+
+    const [, revoked] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash, mustChangePassword: false, tempPasswordUsedAt: null, passwordChangedAt: now },
+      }),
+      prisma.userSession.updateMany({
+        where: { userId, id: { not: currentSessionId }, revokedAt: null },
+        data: { revokedAt: now, revokeReason: SESSION_REVOKE_REASONS.passwordChanged },
+      }),
+    ]);
+    return revoked.count;
+  },
 
   markTempPasswordUsed: (userId: number) =>
     prisma.user.update({ where: { id: userId }, data: { tempPasswordUsedAt: new Date() } }),
 
   updateLastLogin: (userId: number) =>
     prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }),
-
-  countActiveSessions: (userId: number) =>
-    prisma.userSession.count({ where: { userId, revokedAt: null, expiresAt: { gt: new Date() } } }),
 
   createSession: (data: {
     userId: number;

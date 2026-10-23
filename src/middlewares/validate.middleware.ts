@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { ApiError } from '../utils/ApiError.js';
 
 type Schemas = {
@@ -17,7 +17,11 @@ export const validate =
 
       const result = schema.safeParse(req[key]);
       if (!result.success) {
-        return next(ApiError.badRequest('Validation failed', z.flattenError(result.error)));
+        const details = result.error.issues.map((issue) => ({
+          field: issue.path.join('.') || undefined,
+          message: issue.message,
+        }));
+        return next(ApiError.validation(details));
       }
 
       // req.query is a getter in Express 5, so redefine it instead of assigning.

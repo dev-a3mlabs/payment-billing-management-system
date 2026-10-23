@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { ERROR_CODES } from '../config/error-codes.js';
 import { ROLE_PORTAL, type Portal } from '../config/portals.js';
 import { UserStatus, type Role } from '../generated/prisma/enums.js';
 import { authRepository } from '../modules/auth/auth.repository.js';
@@ -27,11 +28,11 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
   try {
     payload = verifyAccessToken(header.slice('Bearer '.length));
   } catch {
-    throw ApiError.unauthorized('Invalid or expired access token');
+    throw ApiError.unauthorized('Invalid or expired access token', ERROR_CODES.INVALID_TOKEN);
   }
 
   if (payload.type !== 'access') {
-    throw ApiError.unauthorized('Invalid or expired access token');
+    throw ApiError.unauthorized('Invalid or expired access token', ERROR_CODES.INVALID_TOKEN);
   }
   if (payload.portal !== portal) {
     throw ApiError.forbidden();
@@ -46,7 +47,7 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
     session.user.uuid !== payload.sub ||
     session.user.status !== UserStatus.active
   ) {
-    throw ApiError.unauthorized('Invalid or expired access token');
+    throw ApiError.unauthorized('Invalid or expired access token', ERROR_CODES.INVALID_TOKEN);
   }
 
   const { user } = session;

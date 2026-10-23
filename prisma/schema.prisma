@@ -34,7 +34,7 @@ model User {
   firstName    String? @map("first_name")
   lastName     String? @map("last_name")
   countryCode  String? @map("country_code")
-  mobileNumber String? @unique @map("mobile_number")
+  mobileNumber String? @map("mobile_number")
 
   createdById  Int?   @map("created_by_id")
   createdBy    User?  @relation("UserCreatedBy", fields: [createdById], references: [id])
@@ -55,6 +55,7 @@ model User {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
+  @@unique([countryCode, mobileNumber])
   @@index([role])
   @@index([createdById])
   @@map("users")

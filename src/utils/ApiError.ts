@@ -1,30 +1,42 @@
+import { ERROR_CODES, type ErrorCode } from '../config/error-codes.js';
+
+export type ErrorDetail = {
+  field?: string;
+  message: string;
+};
+
 export class ApiError extends Error {
   constructor(
     public readonly statusCode: number,
     message: string,
-    public readonly details?: unknown,
+    public readonly code: ErrorCode,
+    public readonly details?: ErrorDetail[],
   ) {
     super(message);
     this.name = 'ApiError';
   }
 
-  static badRequest(message = 'Bad request', details?: unknown) {
-    return new ApiError(400, message, details);
+  static validation(details: ErrorDetail[]) {
+    return new ApiError(400, 'Validation failed', ERROR_CODES.VALIDATION_ERROR, details);
   }
 
-  static unauthorized(message = 'Unauthorized') {
-    return new ApiError(401, message);
+  static badRequest(message = 'Bad request', code: ErrorCode = ERROR_CODES.BAD_REQUEST) {
+    return new ApiError(400, message, code);
   }
 
-  static forbidden(message = 'Forbidden') {
-    return new ApiError(403, message);
+  static unauthorized(message = 'Unauthorized', code: ErrorCode = ERROR_CODES.UNAUTHORIZED) {
+    return new ApiError(401, message, code);
   }
 
-  static notFound(message = 'Not found') {
-    return new ApiError(404, message);
+  static forbidden(message = 'Forbidden', code: ErrorCode = ERROR_CODES.FORBIDDEN) {
+    return new ApiError(403, message, code);
   }
 
-  static conflict(message = 'Conflict') {
-    return new ApiError(409, message);
+  static notFound(message = 'Not found', code: ErrorCode = ERROR_CODES.NOT_FOUND) {
+    return new ApiError(404, message, code);
+  }
+
+  static conflict(message = 'Conflict', code: ErrorCode = ERROR_CODES.CONFLICT) {
+    return new ApiError(409, message, code);
   }
 }

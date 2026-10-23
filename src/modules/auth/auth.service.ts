@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
-import { ACCESS_KEYS } from '../../config/access-keys.js';
 import { ACTIVITY_ACTIONS } from '../../config/activity-actions.js';
 import { env } from '../../config/env.js';
+import { ERROR_CODES } from '../../config/error-codes.js';
 import { ROLE_PORTAL, type Portal } from '../../config/portals.js';
 import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
 import type { User, UserSession } from '../../generated/prisma/client.js';
@@ -9,10 +9,10 @@ import { ActivityStatus, UserStatus } from '../../generated/prisma/enums.js';
 import { ApiError } from '../../utils/ApiError.js';
 import type { ClientInfo } from '../../utils/request.js';
 import { generateRefreshToken, hashToken, signAccessToken } from '../../utils/token.js';
-import { accessService } from '../access/access.service.js';
 import { activityLogService } from '../activity-log/activity-log.service.js';
 import { authRepository } from './auth.repository.js';
-import type { LoginInput } from './v1/auth.schema.js';
+import type { AuthUser } from '../../middlewares/auth.middleware.js';
+import type { ChangePasswordInput, LoginInput } from './v1/auth.schema.js';
 
 // Compared against when the username doesn't exist, so the response takes the same time either way.
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
@@ -56,7 +56,7 @@ const handleTokenReuse = async (userId: number, sessionId: number, client: Clien
     client,
   );
 
-  throw ApiError.unauthorized(INVALID_REFRESH_TOKEN);
+  throw ApiError.unauthorized(INVALID_REFRESH_TOKEN, ERROR_CODES.INVALID_REFRESH_TOKEN);
 };
 
 export const authService = {
@@ -65,32 +65,16 @@ export const authService = {
 
     const passwordMatches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
     if (!user || !passwordMatches) {
-      throw ApiError.unauthorized(INVALID_CREDENTIALS);
+      throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
     }
 
     // Same message as a wrong password, so other portals' accounts aren't revealed.
     if (ROLE_PORTAL[user.role] !== portal) {
-      throw ApiError.unauthorized(INVALID_CREDENTIALS);
+      throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
     }
 
     if (user.status !== UserStatus.active) {
-      throw ApiError.forbidden('Your account is not active. Please contact your admin.');
-    }
-
-    // Checked before the temp password is used up, so a blocked login doesn't burn it.
-    const maxDevices = await accessService.getNumber(user, ACCESS_KEYS.maxDevices);
-    const activeSessions = await authRepository.countActiveSessions(user.id);
-    if (activeSessions >= maxDevices) {
-      await activityLogService.record(
-        {
-          action: ACTIVITY_ACTIONS.loginBlocked,
-          status: ActivityStatus.failed,
-          actorId: user.id,
-          metadata: { reason: 'device_limit', portal, activeSessions, maxDevices },
-        },
-        client,
-      );
-      throw ApiError.forbidden('Device limit reached. Log out from another device or contact your admin.');
+      throw ApiError.forbidden('Your account is not active. Please contact your admin.', ERROR_CODES.ACCOUNT_INACTIVE);
     }
 
     if (user.mustChangePassword) {
@@ -98,6 +82,7 @@ export const authService = {
       if (user.tempPasswordUsedAt) {
         throw ApiError.forbidden(
           'Your temporary password has already been used. Please contact your admin to reset it.',
+          ERROR_CODES.TEMP_PASSWORD_USED,
         );
       }
 
@@ -130,7 +115,7 @@ export const authService = {
   refresh: async (refreshToken: string, portal: Portal, client: ClientInfo) => {
     const stored = await authRepository.findRefreshToken(hashToken(refreshToken));
     if (!stored) {
-      throw ApiError.unauthorized(INVALID_REFRESH_TOKEN);
+      throw ApiError.unauthorized(INVALID_REFRESH_TOKEN, ERROR_CODES.INVALID_REFRESH_TOKEN);
     }
 
     const { session } = stored;
@@ -147,7 +132,7 @@ export const authService = {
       user.status !== UserStatus.active ||
       ROLE_PORTAL[user.role] !== portal
     ) {
-      throw ApiError.unauthorized(INVALID_REFRESH_TOKEN);
+      throw ApiError.unauthorized(INVALID_REFRESH_TOKEN, ERROR_CODES.INVALID_REFRESH_TOKEN);
     }
 
     // Two requests racing with the same token: only one can revoke it, the other counts as reuse.
@@ -159,6 +144,46 @@ export const authService = {
     await authRepository.touchSession(session.id);
 
     return issueTokens(user, session);
+  },
+
+  changePassword: async ({ currentPassword, newPassword }: ChangePasswordInput, user: AuthUser, client: ClientInfo) => {
+    const passwordHash = await authRepository.findPasswordHash(user.id);
+    if (!passwordHash) {
+      throw ApiError.notFound('User not found');
+    }
+
+    if (!(await bcrypt.compare(currentPassword, passwordHash))) {
+      await activityLogService.record(
+        {
+          action: ACTIVITY_ACTIONS.passwordChange,
+          status: ActivityStatus.failed,
+          actorId: user.id,
+          targetUserId: user.id,
+          sessionId: user.sessionId,
+          metadata: { reason: 'wrong_current_password' },
+        },
+        client,
+      );
+      throw ApiError.badRequest('Current password is incorrect', ERROR_CODES.INVALID_CURRENT_PASSWORD);
+    }
+
+    const revokedSessions = await authRepository.updatePassword(
+      user.id,
+      await bcrypt.hash(newPassword, 10),
+      user.sessionId,
+    );
+
+    await activityLogService.record(
+      {
+        action: ACTIVITY_ACTIONS.passwordChange,
+        status: ActivityStatus.success,
+        actorId: user.id,
+        targetUserId: user.id,
+        sessionId: user.sessionId,
+        metadata: { revokedSessions },
+      },
+      client,
+    );
   },
 
   logout: async (refreshToken: string) => {

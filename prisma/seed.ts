@@ -57,20 +57,6 @@ const seedSuperAdmin = async () => {
     create: { userId: user.id, accessKeyId: accessKey.id, value: 'true', updatedById: user.id },
   });
   logger.info(`Granted ${ACCESS_KEYS.superAdminCreate} to ${user.username}`);
-
-  await prisma.accessKey.upsert({
-    where: { key: ACCESS_KEYS.maxDevices },
-    update: {},
-    create: {
-      key: ACCESS_KEYS.maxDevices,
-      module: 'auth',
-      kind: AccessKind.policy,
-      valueType: AccessValueType.int,
-      defaultValue: '3',
-      description: 'Devices logged in at the same time',
-    },
-  });
-  logger.info(`Access key ${ACCESS_KEYS.maxDevices} ready`);
 };
 
 seedSuperAdmin()

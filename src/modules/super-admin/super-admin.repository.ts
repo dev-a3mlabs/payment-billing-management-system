@@ -2,7 +2,13 @@ import { prisma } from '../../db/prisma.js';
 import type { Role } from '../../generated/prisma/enums.js';
 
 export const superAdminRepository = {
-  findUserByUsername: (username: string) => prisma.user.findUnique({ where: { username } }),
+  isUsernameTaken: async (username: string) =>
+    (await prisma.user.findUnique({ where: { username }, select: { id: true } })) !== null,
+
+  findTakenUsernames: async (usernames: string[]) =>
+    (await prisma.user.findMany({ where: { username: { in: usernames } }, select: { username: true } })).map(
+      (user) => user.username,
+    ),
 
   createUser: (data: { username: string; passwordHash: string; role: Role; createdById: number }) =>
     prisma.user.create({
