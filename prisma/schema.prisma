@@ -38,9 +38,14 @@ model User {
 
   createdById  Int?   @map("created_by_id")
   createdBy    User?  @relation("UserCreatedBy", fields: [createdById], references: [id])
+  parentId Int?   @map("parent_id")
+  parent   User?  @relation("UserParent", fields: [parentId], references: [id])
+  children User[] @relation("UserParent")
+
   createdUsers User[] @relation("UserCreatedBy")
 
-  sessions UserSession[]
+  sessions    UserSession[]
+  loginEvents LoginEvent[]
 
   activitiesAsActor  ActivityLog[] @relation("ActivityActor")
   activitiesAsTarget ActivityLog[] @relation("ActivityTarget")
@@ -58,6 +63,8 @@ model User {
   @@unique([countryCode, mobileNumber])
   @@index([role])
   @@index([createdById])
+  @@index([parentId])
+
   @@map("users")
 }
 
@@ -152,9 +159,48 @@ model UserSession {
 
   refreshTokens RefreshToken[]
   activityLogs  ActivityLog[]
+  loginEvents   LoginEvent[]
 
   @@index([userId, revokedAt])
   @@map("user_sessions")
+}
+
+enum LoginStatus {
+  success
+  blocked
+}
+
+model LoginEvent {
+  id          BigInt       @id @default(autoincrement())
+  userId      Int          @map("user_id")
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId   Int?         @map("session_id")
+  session     UserSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  portal      String       @db.VarChar(30)
+  status      LoginStatus
+  blockReason String?      @map("block_reason") @db.VarChar(50)
+
+  requestIp String? @map("request_ip") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(512)
+
+  eventId        String?  @unique @map("event_id") @db.VarChar(64)
+  visitorId      String?  @map("visitor_id") @db.VarChar(64)
+  fingerprintIp  String?  @map("fingerprint_ip") @db.VarChar(45)
+  os             String?  @db.VarChar(50)
+  browserName    String?  @map("browser_name") @db.VarChar(50)
+  countryCode    String?  @map("country_code") @db.Char(2)
+  city           String?  @db.VarChar(100)
+  latitude       Decimal? @db.Decimal(9, 6)
+  longitude      Decimal? @db.Decimal(9, 6)
+  browserDetails Json?    @map("browser_details")
+  ipInfo         Json?    @map("ip_info")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([visitorId])
+  @@index([createdAt])
+  @@map("login_events")
 }
 
 enum ActivityStatus {

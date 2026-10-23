@@ -15,12 +15,24 @@ export const checkUsernameSchema = z.object({
   username: usernameSchema,
 });
 
-export const createUserSchema = z.object({
+const createUserBaseSchema = z.object({
   username: usernameSchema,
   password: passwordSchema,
-  role: z.enum([Role.super_admin, Role.admin, Role.agent], {
-    error: `Role must be one of: ${Role.super_admin}, ${Role.admin}, ${Role.agent}`,
-  }),
 });
+
+export const createUserSchema = z.discriminatedUnion(
+  'role',
+  [
+    createUserBaseSchema.extend({
+      role: z.literal(Role.agent),
+      adminUuid: z.uuid('Admin UUID must be a valid UUID'),
+    }),
+    createUserBaseSchema.extend({
+      role: z.enum([Role.super_admin, Role.admin]),
+    }),
+  ],
+  { error: `Role must be one of: ${Role.super_admin}, ${Role.admin}, ${Role.agent}` },
+);
+
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

@@ -18,5 +18,6 @@ router.use(authenticate(Portal.super_admin));
 router.get('/users/check-username', validate({ query: checkUsernameSchema }), superAdminController.checkUsername);
 router.post('/users', validate({ body: createUserSchema }), superAdminController.createUser);
 router.get('/temp-password', superAdminController.generateTempPassword);
+router.get('/admins', superAdminController.listAdmins);
 
 export default router;

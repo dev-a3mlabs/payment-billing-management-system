@@ -1,5 +1,7 @@
 import { prisma } from '../../db/prisma.js';
+import type { TxClient } from '../../db/transaction.js';
 import { SESSION_REVOKE_REASONS, type SessionRevokeReason } from '../../config/session-revoke-reasons.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 
 export const authRepository = {
   findUserByUsername: (username: string) => prisma.user.findUnique({ where: { username } }),
@@ -24,19 +26,26 @@ export const authRepository = {
     return revoked.count;
   },
 
-  markTempPasswordUsed: (userId: number) =>
-    prisma.user.update({ where: { id: userId }, data: { tempPasswordUsedAt: new Date() } }),
+  // Only marks a temp password that is still unused; count is 0 if it was already used.
+  markTempPasswordUsed: (userId: number, tx: TxClient = prisma) =>
+    tx.user.updateMany({ where: { id: userId, tempPasswordUsedAt: null }, data: { tempPasswordUsedAt: new Date() } }),
 
-  updateLastLogin: (userId: number) =>
-    prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }),
+  updateLastLogin: (userId: number, tx: TxClient = prisma) =>
+    tx.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }),
 
-  createSession: (data: {
-    userId: number;
-    portal: string;
-    ipAddress?: string;
-    userAgent?: string;
-    expiresAt: Date;
-  }) => prisma.userSession.create({ data }),
+  createSession: (
+    data: {
+      userId: number;
+      portal: string;
+      ipAddress?: string;
+      userAgent?: string;
+      expiresAt: Date;
+    },
+    tx: TxClient = prisma,
+  ) => tx.userSession.create({ data }),
+
+  createLoginEvent: (data: Prisma.LoginEventUncheckedCreateInput, tx: TxClient = prisma) =>
+    tx.loginEvent.create({ data }),
 
   findSessionByUuid: (uuid: string) =>
     prisma.userSession.findUnique({ where: { uuid }, include: { user: true } }),

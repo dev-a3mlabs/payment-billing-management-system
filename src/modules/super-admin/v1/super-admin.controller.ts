@@ -21,4 +21,12 @@ export const superAdminController = {
   generateTempPassword: (_req: Request, res: Response) => {
     sendSuccess(res, { message: 'Temporary password generated', data: { password: generateTempPassword() } });
   },
+
+
+  listAdmins: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const admins = await superAdminService.listAdmins(user);
+
+    sendSuccess(res, { message: 'Admins retrieved successfully', data: admins });
+  },
 };

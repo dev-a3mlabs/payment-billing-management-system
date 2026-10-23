@@ -9,6 +9,8 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('1d'),
   REFRESH_TOKEN_EXPIRES_DAYS: z.coerce.number().int().positive().default(15),
+  FINGERPRINT_SECRET_API_KEY: z.string().min(1, 'FINGERPRINT_SECRET_API_KEY is required'),
+  FINGERPRINT_REGION: z.enum(['global', 'eu', 'ap']).default('global'),
 });
 
 const parsed = envSchema.safeParse(process.env);
