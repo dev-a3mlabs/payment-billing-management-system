@@ -13,6 +13,7 @@ import { generateRefreshToken, hashToken, signAccessToken } from '../../utils/to
 import { activityLogService } from '../activity-log/activity-log.service.js';
 import { authRepository } from './auth.repository.js';
 import { toLoginEventData } from './login-event.js';
+import { checkLoginRisk, LOGIN_VERIFICATION_FAILED } from './login-risk.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import type { ChangePasswordInput, LoginInput } from './v1/auth.schema.js';
 import { fingerprintService } from '../../integrations/fingerprint/fingerprint.service.js';
@@ -64,6 +65,18 @@ const handleTokenReuse = async (userId: number, sessionId: number, client: Clien
   throw ApiError.unauthorized(INVALID_REFRESH_TOKEN, ERROR_CODES.INVALID_REFRESH_TOKEN);
 };
 
+// event_id is the only unique column a login can collide on, so P2002 means a replayed event.
+const guardEventReuse = async <T>(fn: () => Promise<T>) => {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw ApiError.forbidden(LOGIN_VERIFICATION_FAILED, ERROR_CODES.LOGIN_BLOCKED);
+    }
+    throw err;
+  }
+};
+
 export const authService = {
   login: async ({ username, password, eventId }: LoginInput, portal: Portal, client: ClientInfo) => {
     const user = await authRepository.findUserByUsername(username);
@@ -82,14 +95,27 @@ export const authService = {
       throw ApiError.forbidden('Your account is not active. Please contact your admin.', ERROR_CODES.ACCOUNT_INACTIVE);
     }
 
-    // A Fingerprint failure must not block the login; the login event is saved without its fields.
-    const fingerprintEvent = await fingerprintService.getEvent(eventId).catch((err) => {
-      logger.warn('Fingerprint lookup failed:', err);
-      return null;
-    });
+    const lookup = await fingerprintService.getEvent(eventId).then(
+      (event) => ({ event, failed: false }),
+      (err) => {
+        logger.warn('Fingerprint lookup failed:', err);
+        return { event: null, failed: true };
+      },
+    );
 
-    if (!fingerprintEvent) {
-      logger.warn(`Fingerprint event not found for user ${user.id} (eventId: ${eventId})`);
+    // Checked before any login writes, so a blocked login doesn't burn the temp password.
+    const block = checkLoginRisk(lookup);
+    if (block) {
+      await guardEventReuse(() =>
+        authRepository.createLoginEvent({
+          userId: user.id,
+          portal,
+          status: LoginStatus.blocked,
+          blockReason: block.reason,
+          ...toLoginEventData(lookup.event, client),
+        }),
+      );
+      throw ApiError.forbidden(block.message, ERROR_CODES.LOGIN_BLOCKED);
     }
 
     // The temporary password works for one login only.
@@ -98,9 +124,8 @@ export const authService = {
     }
 
     // All login writes succeed or fail together, so a rejected login never burns the temp password.
-    let session: UserSession;
-    try {
-      session = await withTransaction(async (tx) => {
+    const session = await guardEventReuse(() =>
+      withTransaction(async (tx) => {
         // Only marks it if still unused, so two parallel logins can't both use the same temp password.
         if (user.mustChangePassword && (await authRepository.markTempPasswordUsed(user.id, tx)).count === 0) {
           throw ApiError.forbidden(TEMP_PASSWORD_USED, ERROR_CODES.TEMP_PASSWORD_USED);
@@ -124,20 +149,14 @@ export const authService = {
             sessionId: created.id,
             portal,
             status: LoginStatus.success,
-            ...toLoginEventData(fingerprintEvent, client),
+            ...toLoginEventData(lookup.event, client),
           },
           tx,
         );
 
         return created;
-      });
-    } catch (err) {
-      // event_id is the only unique column a login can collide on, so this is a replayed event.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        throw ApiError.unauthorized('Device verification failed. Please try again.', ERROR_CODES.FINGERPRINT_EVENT_REUSED);
-      }
-      throw err;
-    }
+      }),
+    );
 
     return {
       mustChangePassword: user.mustChangePassword,

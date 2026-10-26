@@ -61,6 +61,14 @@ export type FingerprintEvent = {
 
   // Smart Signals — only present when enabled on the Fingerprint plan.
   bot?: 'not_detected' | 'good' | 'bad';
+  bot_type?: string;
+  bot_info?: {
+    category: string;
+    provider: string;
+    name: string;
+    identity: string;
+    confidence: 'low' | 'medium' | 'high';
+  };
   developer_tools?: boolean;
   ip_blocklist?: {
     email_spam: boolean;
