@@ -1,4 +1,5 @@
 import type { ActivityAction } from '../../config/activity-actions.js';
+import type { TxClient } from '../../db/transaction.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { ActivityStatus } from '../../generated/prisma/enums.js';
 import type { ClientInfo } from '../../utils/request.js';
@@ -16,5 +17,6 @@ type ActivityEntry = {
 };
 
 export const activityLogService = {
-  record: (entry: ActivityEntry, client: ClientInfo) => activityLogRepository.create({ ...entry, ...client }),
+  record: (entry: ActivityEntry, client: ClientInfo, tx?: TxClient) =>
+    activityLogRepository.create({ ...entry, ...client }, tx),
 };

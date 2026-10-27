@@ -4,7 +4,8 @@ import { SESSION_REVOKE_REASONS, type SessionRevokeReason } from '../../config/s
 import type { Prisma } from '../../generated/prisma/client.js';
 
 export const authRepository = {
-  findUserByUsername: (username: string) => prisma.user.findUnique({ where: { username } }),
+  findUserByUsername: (username: string) =>
+    prisma.user.findUnique({ where: { username }, include: { parent: { select: { status: true } } } }),
 
   findPasswordHash: async (userId: number) =>
     (await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } }))?.passwordHash,
@@ -48,7 +49,10 @@ export const authRepository = {
     tx.loginEvent.create({ data }),
 
   findSessionByUuid: (uuid: string) =>
-    prisma.userSession.findUnique({ where: { uuid }, include: { user: true } }),
+    prisma.userSession.findUnique({
+      where: { uuid },
+      include: { user: { include: { parent: { select: { status: true } } } } },
+    }),
 
   touchSession: (sessionId: number) =>
     prisma.userSession.update({ where: { id: sessionId }, data: { lastActiveAt: new Date() } }),
@@ -59,8 +63,8 @@ export const authRepository = {
       data: { revokedAt: new Date(), revokeReason: reason },
     }),
 
-  revokeAllSessions: (userId: number, reason: SessionRevokeReason) =>
-    prisma.userSession.updateMany({
+  revokeAllSessions: (userId: number, reason: SessionRevokeReason, tx: TxClient = prisma) =>
+    tx.userSession.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date(), revokeReason: reason },
     }),
@@ -69,7 +73,10 @@ export const authRepository = {
     prisma.refreshToken.create({ data }),
 
   findRefreshToken: (tokenHash: string) =>
-    prisma.refreshToken.findUnique({ where: { tokenHash }, include: { session: { include: { user: true } } } }),
+    prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      include: { session: { include: { user: { include: { parent: { select: { status: true } } } } } } },
+    }),
 
   // Only revokes a token that is still active; count is 0 if it was already revoked.
   revokeRefreshToken: (id: number) =>

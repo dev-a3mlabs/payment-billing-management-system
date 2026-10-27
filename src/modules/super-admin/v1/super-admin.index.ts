@@ -5,7 +5,14 @@ import { validate } from '../../../middlewares/validate.middleware.js';
 import { authRoutesFor } from '../../auth/v1/auth.index.js';
 import { profileRoutesFor } from '../../profile/v1/profile.index.js';
 import { superAdminController } from './super-admin.controller.js';
-import { checkUsernameSchema, createUserSchema } from './super-admin.schema.js';
+import {
+  changeUserStatusSchema,
+  checkUsernameSchema,
+  createUserSchema,
+  updateUserPermissionsSchema,
+  userPermissionParamsSchema,
+  userUuidParamsSchema,
+} from './super-admin.schema.js';
 
 const router = Router();
 
@@ -19,5 +26,23 @@ router.get('/users/check-username', validate({ query: checkUsernameSchema }), su
 router.post('/users', validate({ body: createUserSchema }), superAdminController.createUser);
 router.get('/temp-password', superAdminController.generateTempPassword);
 router.get('/admins', superAdminController.listAdmins);
+router.get('/permissions', superAdminController.listPermissions);
+router.get('/users/:uuid/permissions', validate({ params: userUuidParamsSchema }), superAdminController.getUserPermissions);
+router.put(
+  '/users/:uuid/permissions',
+  validate({ params: userUuidParamsSchema, body: updateUserPermissionsSchema }),
+  superAdminController.updateUserPermissions,
+);
+router.delete(
+  '/users/:uuid/permissions/:key',
+  validate({ params: userPermissionParamsSchema }),
+  superAdminController.resetUserPermission,
+);
+router.patch(
+  '/users/:uuid/status',
+  validate({ params: userUuidParamsSchema, body: changeUserStatusSchema }),
+  superAdminController.changeUserStatus,
+);
+router.delete('/users/:uuid', validate({ params: userUuidParamsSchema }), superAdminController.deleteUser);
 
 export default router;

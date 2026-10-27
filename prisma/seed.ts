@@ -1,8 +1,8 @@
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { ACCESS_KEYS } from '../src/config/access-keys.js';
+import { ACCESS_KEY_DEFINITIONS } from '../src/config/access-keys.js';
 import { prisma } from '../src/db/prisma.js';
-import { AccessKind, AccessValueType, Role } from '../src/generated/prisma/enums.js';
+import { Role } from '../src/generated/prisma/enums.js';
 import { logger } from '../src/utils/logger.js';
 
 const seedEnvSchema = z.object({
@@ -21,11 +21,12 @@ const seedSuperAdmin = async () => {
   }
   const seedEnv = parsed.data;
 
-  let user = await prisma.user.findUnique({ where: { username: seedEnv.SUPER_ADMIN_USERNAME } });
-  if (user) {
-    logger.info(`Super admin already exists (${user.username}), skipping create`);
+  // There is only ever one super admin.
+  const superAdmin = await prisma.user.findFirst({ where: { role: Role.super_admin }, select: { username: true } });
+  if (superAdmin) {
+    logger.info(`Super admin already exists (${superAdmin.username}), skipping create`);
   } else {
-    user = await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         username: seedEnv.SUPER_ADMIN_USERNAME,
         email: seedEnv.SUPER_ADMIN_EMAIL,
@@ -38,25 +39,12 @@ const seedSuperAdmin = async () => {
     logger.info(`Super admin created (${user.username})`);
   }
 
-  const accessKey = await prisma.accessKey.upsert({
-    where: { key: ACCESS_KEYS.superAdminCreate },
-    update: {},
-    create: {
-      key: ACCESS_KEYS.superAdminCreate,
-      module: 'super_admin',
-      kind: AccessKind.permission,
-      valueType: AccessValueType.bool,
-      defaultValue: 'false',
-      description: 'Create super admins',
-    },
-  });
-
-  await prisma.accessUserValue.upsert({
-    where: { userId_accessKeyId: { userId: user.id, accessKeyId: accessKey.id } },
-    update: { value: 'true' },
-    create: { userId: user.id, accessKeyId: accessKey.id, value: 'true', updatedById: user.id },
-  });
-  logger.info(`Granted ${ACCESS_KEYS.superAdminCreate} to ${user.username}`);
+  // Code is the source of truth, so existing keys are updated to match it.
+  for (const { key, module, kind, valueType, defaultValue, description } of ACCESS_KEY_DEFINITIONS) {
+    const data = { module, kind, valueType, defaultValue, description };
+    await prisma.accessKey.upsert({ where: { key }, update: data, create: { key, ...data } });
+  }
+  logger.info(`${ACCESS_KEY_DEFINITIONS.length} access keys ready`);
 };
 
 seedSuperAdmin()

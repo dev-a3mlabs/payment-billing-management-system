@@ -22,7 +22,7 @@ export const prisma = new PrismaClient({ adapter });
 export const connectDatabase = async () => {
   const target = `${dbUrl.hostname}:${dbUrl.port || 3306}/${dbUrl.pathname.slice(1)}`;
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await prisma.user.findFirst({ select: { id: true } });
   } catch (err) {
     throw new Error(
       `Could not connect to MySQL at ${target}. Check that MySQL is running, the database exists, and DATABASE_URL is correct.`,

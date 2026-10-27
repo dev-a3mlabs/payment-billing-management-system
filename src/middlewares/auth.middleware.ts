@@ -1,8 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ERROR_CODES } from '../config/error-codes.js';
 import { ROLE_PORTAL, type Portal } from '../config/portals.js';
-import { UserStatus, type Role } from '../generated/prisma/enums.js';
+import type { Role } from '../generated/prisma/enums.js';
 import { authRepository } from '../modules/auth/auth.repository.js';
+import { userService } from '../modules/user/user.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { verifyAccessToken, type AccessTokenPayload } from '../utils/token.js';
 
@@ -45,7 +46,7 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
     session.revokedAt ||
     session.expiresAt < new Date() ||
     session.user.uuid !== payload.sub ||
-    session.user.status !== UserStatus.active
+    !userService.isActive(session.user)
   ) {
     throw ApiError.unauthorized('Invalid or expired access token', ERROR_CODES.INVALID_TOKEN);
   }

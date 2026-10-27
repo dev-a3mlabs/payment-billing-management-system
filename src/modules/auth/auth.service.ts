@@ -11,6 +11,7 @@ import { ApiError } from '../../utils/ApiError.js';
 import type { ClientInfo } from '../../utils/request.js';
 import { generateRefreshToken, hashToken, signAccessToken } from '../../utils/token.js';
 import { activityLogService } from '../activity-log/activity-log.service.js';
+import { userService } from '../user/user.service.js';
 import { authRepository } from './auth.repository.js';
 import { toLoginEventData } from './login-event.js';
 import { checkLoginRisk, LOGIN_VERIFICATION_FAILED } from './login-risk.js';
@@ -82,7 +83,8 @@ export const authService = {
     const user = await authRepository.findUserByUsername(username);
 
     const passwordMatches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
-    if (!user || !passwordMatches) {
+    // A deleted account looks the same as one that never existed.
+    if (!user || !passwordMatches || user.status === UserStatus.deleted) {
       throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
     }
 
@@ -91,7 +93,7 @@ export const authService = {
       throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
     }
 
-    if (user.status !== UserStatus.active) {
+    if (!userService.isActive(user)) {
       throw ApiError.forbidden('Your account is not active. Please contact your admin.', ERROR_CODES.ACCOUNT_INACTIVE);
     }
 
@@ -189,7 +191,7 @@ export const authService = {
       session.revokedAt ||
       stored.expiresAt < new Date() ||
       session.portal !== portal ||
-      user.status !== UserStatus.active ||
+      !userService.isActive(user) ||
       ROLE_PORTAL[user.role] !== portal
     ) {
       throw ApiError.unauthorized(INVALID_REFRESH_TOKEN, ERROR_CODES.INVALID_REFRESH_TOKEN);

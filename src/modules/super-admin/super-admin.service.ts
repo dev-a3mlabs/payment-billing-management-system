@@ -1,5 +1,4 @@
 import { randomInt } from 'node:crypto';
-import { ACCESS_KEYS } from '../../config/access-keys.js';
 import { ERROR_CODES } from '../../config/error-codes.js';
 import { Role, UserStatus } from '../../generated/prisma/enums.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
@@ -8,7 +7,8 @@ import { accessService } from '../access/access.service.js';
 import { userRepository } from '../user/user.repository.js';
 import { userService } from '../user/user.service.js';
 import { superAdminRepository } from './super-admin.repository.js';
-import type { CreateUserInput } from './v1/super-admin.schema.js';
+import type { ClientInfo } from '../../utils/request.js';
+import type { ChangeUserStatusInput, CreateUserInput, UpdateUserPermissionsInput } from './v1/super-admin.schema.js';
 
 const MAX_USERNAME_LENGTH = 30;
 const SUGGESTION_COUNT = 3;
@@ -22,6 +22,16 @@ const buildUsernameCandidates = (username: string) => {
 
   const candidates = suffixes.map((suffix) => username.slice(0, MAX_USERNAME_LENGTH - suffix.length) + suffix);
   return [...new Set(candidates)].filter((candidate) => candidate !== username);
+};
+
+const MANAGED_ROLES: Role[] = [Role.admin, Role.agent];
+
+const findManagedUser = async (uuid: string) => {
+  const user = await userRepository.findByUuid(uuid);
+  if (!user || !MANAGED_ROLES.includes(user.role) || user.status === UserStatus.deleted) {
+    throw ApiError.notFound('User not found');
+  }
+  return user;
 };
 
 export const superAdminService = {
@@ -38,10 +48,6 @@ export const superAdminService = {
   },
 
   createUser: async (input: CreateUserInput, creator: AuthUser) => {
-    if (input.role === Role.super_admin && !(await accessService.hasPermission(creator, ACCESS_KEYS.superAdminCreate))) {
-      throw ApiError.forbidden('You do not have permission to create super admins');
-    }
-
     let parentId: number | undefined;
     if (input.role === Role.agent) {
       const admin = await userRepository.findByUuid(input.adminUuid);
@@ -63,5 +69,27 @@ export const superAdminService = {
 
   listAdmins: async (requester: AuthUser) => {
     return userRepository.findAllByRole(Role.admin);
-  }, 
+  },
+
+  listPermissions: () => accessService.listDefinitions(),
+
+  getUserPermissions: async (uuid: string) => accessService.getUserValues(await findManagedUser(uuid)),
+
+  updateUserPermissions: async (uuid: string, { values }: UpdateUserPermissionsInput, superAdmin: AuthUser) => {
+    const user = await findManagedUser(uuid);
+    await accessService.setUserValues(user, values, superAdmin.id);
+    return accessService.getUserValues(user);
+  },
+
+  resetUserPermission: async (uuid: string, key: string) => {
+    const user = await findManagedUser(uuid);
+    await accessService.resetUserValue(user, key);
+    return accessService.getUserValues(user);
+  },
+
+  changeUserStatus: async (uuid: string, { status }: ChangeUserStatusInput, superAdmin: AuthUser, client: ClientInfo) =>
+    userService.changeStatus(await findManagedUser(uuid), status, superAdmin.id, client),
+
+  deleteUser: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
+    userService.changeStatus(await findManagedUser(uuid), UserStatus.deleted, superAdmin.id, client),
 };
