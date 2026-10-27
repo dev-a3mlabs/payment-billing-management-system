@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { ACTIVITY_ACTIONS } from '../../config/activity-actions.js';
 import { env } from '../../config/env.js';
 import { ERROR_CODES } from '../../config/error-codes.js';
+import { LOGIN_BLOCK_REASONS } from '../../config/login-block-reasons.js';
 import { ROLE_PORTAL, type Portal } from '../../config/portals.js';
 import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
 import { withTransaction } from '../../db/transaction.js';
@@ -12,6 +13,7 @@ import type { ClientInfo } from '../../utils/request.js';
 import { generateRefreshToken, hashToken, signAccessToken } from '../../utils/token.js';
 import { activityLogService } from '../activity-log/activity-log.service.js';
 import { userService } from '../user/user.service.js';
+import { userSecurityService } from '../user-security/user-security.service.js';
 import { authRepository } from './auth.repository.js';
 import { toLoginEventData } from './login-event.js';
 import { checkLoginRisk, LOGIN_VERIFICATION_FAILED } from './login-risk.js';
@@ -84,8 +86,33 @@ export const authService = {
 
     const passwordMatches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
     // A deleted account looks the same as one that never existed.
-    if (!user || !passwordMatches || user.status === UserStatus.deleted) {
+    if (!user || user.status === UserStatus.deleted) {
       throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
+    }
+
+    // Same response whether or not this attempt locked the account, so the lock isn't revealed.
+    if (!passwordMatches) {
+      await userSecurityService.recordFailedLogin(user, client);
+      await authRepository.createLoginEvent({
+        userId: user.id,
+        portal,
+        status: LoginStatus.failed,
+        blockReason: LOGIN_BLOCK_REASONS.wrongPassword,
+        ...toLoginEventData(null, client),
+      });
+      throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
+    }
+
+    // Only told after the correct password, so a locked account can't be discovered by guessing.
+    if (user.security?.lockedAt) {
+      await authRepository.createLoginEvent({
+        userId: user.id,
+        portal,
+        status: LoginStatus.blocked,
+        blockReason: LOGIN_BLOCK_REASONS.accountLocked,
+        ...toLoginEventData(null, client),
+      });
+      throw ApiError.forbidden('Your account is locked. Please contact your administrator.', ERROR_CODES.ACCOUNT_LOCKED);
     }
 
     // Same message as a wrong password, so other portals' accounts aren't revealed.
@@ -134,6 +161,10 @@ export const authService = {
         }
 
         await authRepository.updateLastLogin(user.id, tx);
+
+        if (user.security?.failedLoginAttempts) {
+          await userSecurityService.resetAttempts(user.id, tx);
+        }
 
         const created = await authRepository.createSession(
           {

@@ -26,6 +26,20 @@ export const adminController = {
     sendSuccess(res, { message: 'Agent quota retrieved successfully', data });
   },
 
+  getAgentPermissions: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const data = await adminService.getAgentPermissions(req.params.uuid as string, user);
+
+    sendSuccess(res, { message: 'Agent permissions retrieved successfully', data });
+  },
+
+  updateAgentPermissions: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const data = await adminService.updateAgentPermissions(req.params.uuid as string, req.body, user);
+
+    sendSuccess(res, { message: 'Agent permissions updated successfully', data });
+  },
+
   changeAgentStatus: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
     await adminService.changeAgentStatus(req.params.uuid as string, req.body, user, getClientInfo(req));

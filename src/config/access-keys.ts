@@ -1,6 +1,8 @@
 import { AccessKind, AccessValueType, Role } from '../generated/prisma/enums.js';
 
 export const ACCESS_KEYS = {
+  lockoutEnabled: 'auth.lockout.enabled',
+  lockoutMaxAttempts: 'auth.lockout.max_attempts',
   agentCreate: 'user.agent.create',
   agentMax: 'user.agent.max',
   agentStatusChange: 'user.agent.status_change',
@@ -15,12 +17,37 @@ export type AccessKeyDefinition = {
   valueType: AccessValueType;
   defaultValue: string;
   appliesTo: Role[];
+  editableBy: Role[];
   min?: number;
   max?: number;
 };
 
 // The single source of truth for every access key. Keep sorted by module, then key.
 export const ACCESS_KEY_DEFINITIONS: AccessKeyDefinition[] = [
+  {
+    key: ACCESS_KEYS.lockoutEnabled,
+    label: 'Lock account after wrong passwords',
+    description: 'Lock the account after too many wrong passwords within 30 minutes',
+    module: 'auth',
+    kind: AccessKind.policy,
+    valueType: AccessValueType.bool,
+    defaultValue: 'false',
+    appliesTo: [Role.admin, Role.agent],
+    editableBy: [Role.super_admin, Role.admin],
+  },
+  {
+    key: ACCESS_KEYS.lockoutMaxAttempts,
+    label: 'Wrong password attempts allowed',
+    description: 'Wrong passwords allowed within 30 minutes before the account is locked',
+    module: 'auth',
+    kind: AccessKind.limit,
+    valueType: AccessValueType.int,
+    defaultValue: '5',
+    appliesTo: [Role.admin, Role.agent],
+    editableBy: [Role.super_admin, Role.admin],
+    min: 3,
+    max: 20,
+  },
   {
     key: ACCESS_KEYS.agentCreate,
     label: 'Create agents',
@@ -30,6 +57,7 @@ export const ACCESS_KEY_DEFINITIONS: AccessKeyDefinition[] = [
     valueType: AccessValueType.bool,
     defaultValue: 'false',
     appliesTo: [Role.admin],
+    editableBy: [Role.super_admin],
   },
   {
     key: ACCESS_KEYS.agentMax,
@@ -40,6 +68,7 @@ export const ACCESS_KEY_DEFINITIONS: AccessKeyDefinition[] = [
     valueType: AccessValueType.int,
     defaultValue: '0',
     appliesTo: [Role.admin],
+    editableBy: [Role.super_admin],
     min: 1,
     max: 1000,
   },
@@ -52,5 +81,6 @@ export const ACCESS_KEY_DEFINITIONS: AccessKeyDefinition[] = [
     valueType: AccessValueType.bool,
     defaultValue: 'false',
     appliesTo: [Role.admin],
+    editableBy: [Role.super_admin],
   },
 ];

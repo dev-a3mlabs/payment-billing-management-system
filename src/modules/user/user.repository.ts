@@ -21,7 +21,17 @@ export const userRepository = {
   findAllByRole: (role: Role) =>
     prisma.user.findMany({
       where: { role, status: { not: UserStatus.deleted } },
-      select: { uuid: true, username: true, role: true, status: true, createdAt: true, firstName: true, lastName: true, email: true },
+      select: {
+        uuid: true,
+        username: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        security: { select: { failedLoginAttempts: true, lockedAt: true } },
+      },
     }),
 
   updateStatus: (id: number, status: UserStatus, tx: TxClient) =>
@@ -32,6 +42,9 @@ export const userRepository = {
 
   // An update holds the row lock until the transaction ends.
   lockById: (id: number, tx: TxClient) => tx.user.update({ where: { id }, data: { updatedAt: new Date() }, select: { id: true } }),
+
+  findChildren: (parentId: number, tx: TxClient) =>
+    tx.user.findMany({ where: { parentId, status: { not: UserStatus.deleted } }, select: { id: true, status: true } }),
 
   countChildren: (parentId: number, tx: TxClient = prisma) =>
     tx.user.count({ where: { parentId, status: { not: UserStatus.deleted } } }),

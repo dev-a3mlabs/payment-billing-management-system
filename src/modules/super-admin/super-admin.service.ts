@@ -6,6 +6,7 @@ import { ApiError } from '../../utils/ApiError.js';
 import { accessService } from '../access/access.service.js';
 import { userRepository } from '../user/user.repository.js';
 import { userService } from '../user/user.service.js';
+import { userSecurityService } from '../user-security/user-security.service.js';
 import { superAdminRepository } from './super-admin.repository.js';
 import type { ClientInfo } from '../../utils/request.js';
 import type { ChangeUserStatusInput, CreateUserInput, UpdateUserPermissionsInput } from './v1/super-admin.schema.js';
@@ -77,18 +78,21 @@ export const superAdminService = {
 
   updateUserPermissions: async (uuid: string, { values }: UpdateUserPermissionsInput, superAdmin: AuthUser) => {
     const user = await findManagedUser(uuid);
-    await accessService.setUserValues(user, values, superAdmin.id);
+    await accessService.setUserValues(user, values, superAdmin);
     return accessService.getUserValues(user);
   },
 
   resetUserPermission: async (uuid: string, key: string) => {
     const user = await findManagedUser(uuid);
-    await accessService.resetUserValue(user, key);
+    await accessService.resetUserValue(user, key, Role.super_admin);
     return accessService.getUserValues(user);
   },
 
   changeUserStatus: async (uuid: string, { status }: ChangeUserStatusInput, superAdmin: AuthUser, client: ClientInfo) =>
     userService.changeStatus(await findManagedUser(uuid), status, superAdmin.id, client),
+
+  unlockUser: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
+    userSecurityService.unlock((await findManagedUser(uuid)).id, superAdmin.id, client),
 
   deleteUser: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
     userService.changeStatus(await findManagedUser(uuid), UserStatus.deleted, superAdmin.id, client),

@@ -47,6 +47,7 @@ model User {
 
   sessions    UserSession[]
   loginEvents LoginEvent[]
+  security    UserSecurity?
 
   activitiesAsActor  ActivityLog[] @relation("ActivityActor")
   activitiesAsTarget ActivityLog[] @relation("ActivityTarget")
@@ -169,7 +170,20 @@ model UserSession {
 
 enum LoginStatus {
   success
+  failed
   blocked
+}
+
+model UserSecurity {
+  userId              Int       @id @map("user_id")
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lastFailedLoginAt   DateTime? @map("last_failed_login_at")
+  lockedAt            DateTime? @map("locked_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([lockedAt])
+  @@map("user_security")
 }
 
 model LoginEvent {

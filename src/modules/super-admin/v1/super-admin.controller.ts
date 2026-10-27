@@ -60,6 +60,13 @@ export const superAdminController = {
     sendSuccess(res, { message: 'User status updated successfully' });
   },
 
+  unlockUser: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    await superAdminService.unlockUser(req.params.uuid as string, user, getClientInfo(req));
+
+    sendSuccess(res, { message: 'User unlocked successfully' });
+  },
+
   deleteUser: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
     await superAdminService.deleteUser(req.params.uuid as string, user, getClientInfo(req));

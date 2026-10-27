@@ -20,8 +20,14 @@ const toValue = (valueType: AccessValueType, raw: string) => {
   return raw;
 };
 
-const findDefinition = (key: string, role: Role) =>
-  ACCESS_KEY_DEFINITIONS.find((definition) => definition.key === key && definition.appliesTo.includes(role));
+// Definitions that apply to this user and, when an editor is given, that the editor may change.
+const definitionsFor = (role: Role, editorRole?: Role) =>
+  ACCESS_KEY_DEFINITIONS.filter(
+    (definition) => definition.appliesTo.includes(role) && (!editorRole || definition.editableBy.includes(editorRole)),
+  );
+
+const findDefinition = (key: string, role: Role, editorRole: Role) =>
+  definitionsFor(role, editorRole).find((definition) => definition.key === key);
 
 // Returns an error message, or null if the value is valid for this key.
 const checkValue = (definition: AccessKeyDefinition, value: unknown) => {
@@ -55,8 +61,8 @@ export const accessService = {
       defaultValue: toValue(definition.valueType, definition.defaultValue),
     })),
 
-  getUserValues: async (user: AccessUser) => {
-    const definitions = ACCESS_KEY_DEFINITIONS.filter((definition) => definition.appliesTo.includes(user.role));
+  getUserValues: async (user: AccessUser, editorRole?: Role) => {
+    const definitions = definitionsFor(user.role, editorRole);
     const accessKeys = await accessRepository.findKeysWithValues(
       definitions.map((definition) => definition.key),
       user.id,
@@ -78,10 +84,10 @@ export const accessService = {
     });
   },
 
-  setUserValues: async (user: AccessUser, values: Record<string, unknown>, updatedById: number) => {
+  setUserValues: async (user: AccessUser, values: Record<string, unknown>, editor: AccessUser) => {
     const details: ErrorDetail[] = [];
     for (const [key, value] of Object.entries(values)) {
-      const definition = findDefinition(key, user.role);
+      const definition = findDefinition(key, user.role, editor.role);
       const message = definition ? checkValue(definition, value) : 'Unknown permission';
       if (message) {
         details.push({ field: `values.${key}`, message });
@@ -93,13 +99,13 @@ export const accessService = {
 
     await withTransaction(async (tx) => {
       for (const [key, value] of Object.entries(values)) {
-        await accessRepository.upsertUserValue(user.id, key, String(value), updatedById, tx);
+        await accessRepository.upsertUserValue(user.id, key, String(value), editor.id, tx);
       }
     });
   },
 
-  resetUserValue: async (user: AccessUser, key: string) => {
-    if (!findDefinition(key, user.role)) {
+  resetUserValue: async (user: AccessUser, key: string, editorRole: Role) => {
+    if (!findDefinition(key, user.role, editorRole)) {
       throw ApiError.notFound('Permission not found');
     }
     await accessRepository.deleteUserValue(user.id, key);

@@ -7,10 +7,28 @@ import type { ClientInfo } from '../../utils/request.js';
 import { accessService } from '../access/access.service.js';
 import { userRepository } from '../user/user.repository.js';
 import { userService } from '../user/user.service.js';
+import type { UpdateUserPermissionsInput } from '../super-admin/v1/super-admin.schema.js';
 import type { ChangeAgentStatusInput, CreateAgentInput } from './v1/admin.schema.js';
+
+const findOwnAgent = async (uuid: string, admin: AuthUser) => {
+  const agent = await userRepository.findByUuid(uuid);
+  if (!agent || agent.parentId !== admin.id || agent.status === UserStatus.deleted) {
+    throw ApiError.notFound('Agent not found');
+  }
+  return agent;
+};
 
 export const adminService = {
   getPermissions: (admin: AuthUser) => accessService.getUserValues(admin),
+
+  getAgentPermissions: async (agentUuid: string, admin: AuthUser) =>
+    accessService.getUserValues(await findOwnAgent(agentUuid, admin), admin.role),
+
+  updateAgentPermissions: async (agentUuid: string, { values }: UpdateUserPermissionsInput, admin: AuthUser) => {
+    const agent = await findOwnAgent(agentUuid, admin);
+    await accessService.setUserValues(agent, values, admin);
+    return accessService.getUserValues(agent, admin.role);
+  },
 
   getAgentQuota: async (admin: AuthUser) => {
     const [currentAgents, maxAgents] = await Promise.all([
@@ -46,10 +64,7 @@ export const adminService = {
       throw ApiError.forbidden('You do not have permission to change agent status');
     }
 
-    const agent = await userRepository.findByUuid(agentUuid);
-    if (!agent || agent.parentId !== admin.id || agent.status === UserStatus.deleted) {
-      throw ApiError.notFound('Agent not found');
-    }
+    const agent = await findOwnAgent(agentUuid, admin);
     if (agent.status === UserStatus.suspended) {
       throw ApiError.forbidden('You cannot change the status of this agent');
     }

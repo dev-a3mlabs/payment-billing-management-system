@@ -5,7 +5,7 @@ import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
 import { prisma } from '../../db/prisma.js';
 import { withTransaction, type TxClient } from '../../db/transaction.js';
 import { Prisma } from '../../generated/prisma/client.js';
-import { ActivityStatus, UserStatus, type Role } from '../../generated/prisma/enums.js';
+import { ActivityStatus, Role, UserStatus } from '../../generated/prisma/enums.js';
 import { ApiError } from '../../utils/ApiError.js';
 import type { ClientInfo } from '../../utils/request.js';
 import { activityLogService } from '../activity-log/activity-log.service.js';
@@ -24,6 +24,32 @@ const REVOKE_REASONS = {
   [UserStatus.inactive]: SESSION_REVOKE_REASONS.accountInactive,
   [UserStatus.suspended]: SESSION_REVOKE_REASONS.accountSuspended,
   [UserStatus.deleted]: SESSION_REVOKE_REASONS.accountDeleted,
+};
+
+const applyStatus = async (
+  target: { id: number; status: UserStatus },
+  status: UserStatus,
+  actorId: number,
+  client: ClientInfo,
+  tx: TxClient,
+) => {
+  await userRepository.updateStatus(target.id, status, tx);
+
+  if (status !== UserStatus.active) {
+    await authRepository.revokeAllSessions(target.id, REVOKE_REASONS[status], tx);
+  }
+
+  await activityLogService.record(
+    {
+      action: ACTIVITY_ACTIONS.statusChange,
+      status: ActivityStatus.success,
+      actorId,
+      targetUserId: target.id,
+      metadata: { from: target.status, to: status },
+    },
+    client,
+    tx,
+  );
 };
 
 export const userService = {
@@ -49,27 +75,23 @@ export const userService = {
   isActive: (user: { status: UserStatus; parent: { status: UserStatus } | null }) =>
     user.status === UserStatus.active && (!user.parent || user.parent.status === UserStatus.active),
 
-  changeStatus: async (target: { id: number; status: UserStatus }, status: UserStatus, actorId: number, client: ClientInfo) => {
+  changeStatus: async (
+    target: { id: number; role: Role; status: UserStatus },
+    status: UserStatus,
+    actorId: number,
+    client: ClientInfo,
+  ) => {
     if (target.status === status) return;
 
     await withTransaction(async (tx) => {
-      await userRepository.updateStatus(target.id, status, tx);
+      await applyStatus(target, status, actorId, client, tx);
 
-      if (status !== UserStatus.active) {
-        await authRepository.revokeAllSessions(target.id, REVOKE_REASONS[status], tx);
+      // Deleting an admin also deletes their agents.
+      if (status === UserStatus.deleted && target.role === Role.admin) {
+        for (const agent of await userRepository.findChildren(target.id, tx)) {
+          await applyStatus(agent, status, actorId, client, tx);
+        }
       }
-
-      await activityLogService.record(
-        {
-          action: ACTIVITY_ACTIONS.statusChange,
-          status: ActivityStatus.success,
-          actorId,
-          targetUserId: target.id,
-          metadata: { from: target.status, to: status },
-        },
-        client,
-        tx,
-      );
     });
   },
 };

@@ -43,6 +43,7 @@ router.patch(
   validate({ params: userUuidParamsSchema, body: changeUserStatusSchema }),
   superAdminController.changeUserStatus,
 );
+router.post('/users/:uuid/unlock', validate({ params: userUuidParamsSchema }), superAdminController.unlockUser);
 router.delete('/users/:uuid', validate({ params: userUuidParamsSchema }), superAdminController.deleteUser);
 
 export default router;

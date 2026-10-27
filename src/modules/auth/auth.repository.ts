@@ -5,7 +5,10 @@ import type { Prisma } from '../../generated/prisma/client.js';
 
 export const authRepository = {
   findUserByUsername: (username: string) =>
-    prisma.user.findUnique({ where: { username }, include: { parent: { select: { status: true } } } }),
+    prisma.user.findUnique({
+      where: { username },
+      include: { parent: { select: { status: true } }, security: true },
+    }),
 
   findPasswordHash: async (userId: number) =>
     (await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } }))?.passwordHash,
