@@ -6,6 +6,7 @@ import { ApiError } from '../../utils/ApiError.js';
 import { accessService } from '../access/access.service.js';
 import { userRepository } from '../user/user.repository.js';
 import { userService } from '../user/user.service.js';
+import { sessionService } from '../session/session.service.js';
 import { userSecurityService } from '../user-security/user-security.service.js';
 import { superAdminRepository } from './super-admin.repository.js';
 import type { ClientInfo } from '../../utils/request.js';
@@ -90,6 +91,12 @@ export const superAdminService = {
 
   changeUserStatus: async (uuid: string, { status }: ChangeUserStatusInput, superAdmin: AuthUser, client: ClientInfo) =>
     userService.changeStatus(await findManagedUser(uuid), status, superAdmin.id, client),
+
+  getUserSessions: async (uuid: string) => sessionService.list((await findManagedUser(uuid)).id),
+
+  revokeUserSessions: async (uuid: string) => {
+    await sessionService.revokeAll((await findManagedUser(uuid)).id);
+  },
 
   unlockUser: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
     userSecurityService.unlock((await findManagedUser(uuid)).id, superAdmin.id, client),

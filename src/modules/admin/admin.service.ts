@@ -5,6 +5,7 @@ import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import { ApiError } from '../../utils/ApiError.js';
 import type { ClientInfo } from '../../utils/request.js';
 import { accessService } from '../access/access.service.js';
+import { sessionService } from '../session/session.service.js';
 import { userRepository } from '../user/user.repository.js';
 import { userService } from '../user/user.service.js';
 import type { UpdateUserPermissionsInput } from '../super-admin/v1/super-admin.schema.js';
@@ -23,6 +24,13 @@ export const adminService = {
 
   getAgentPermissions: async (agentUuid: string, admin: AuthUser) =>
     accessService.getUserValues(await findOwnAgent(agentUuid, admin), admin.role),
+
+  getAgentSessions: async (agentUuid: string, admin: AuthUser) =>
+    sessionService.list((await findOwnAgent(agentUuid, admin)).id),
+
+  revokeAgentSessions: async (agentUuid: string, admin: AuthUser) => {
+    await sessionService.revokeAll((await findOwnAgent(agentUuid, admin)).id);
+  },
 
   updateAgentPermissions: async (agentUuid: string, { values }: UpdateUserPermissionsInput, admin: AuthUser) => {
     const agent = await findOwnAgent(agentUuid, admin);

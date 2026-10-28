@@ -12,9 +12,13 @@ import { userSecurityRepository } from './user-security.repository.js';
 const ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 
 export const userSecurityService = {
+  // remainingAttempts is null when lockout is off for this user.
   recordFailedLogin: async (user: { id: number; role: Role; security: UserSecurity | null }, client: ClientInfo) => {
     const { security } = user;
-    if (security?.lockedAt || !(await accessService.hasPermission(user, ACCESS_KEYS.lockoutEnabled))) return;
+    if (security?.lockedAt) return { locked: true, remainingAttempts: 0 };
+    if (!(await accessService.hasPermission(user, ACCESS_KEYS.lockoutEnabled))) {
+      return { locked: false, remainingAttempts: null };
+    }
 
     const maxAttempts = await accessService.getNumber(user, ACCESS_KEYS.lockoutMaxAttempts);
     const attempts =
@@ -36,6 +40,8 @@ export const userSecurityService = {
         client,
       );
     }
+
+    return { locked: lock, remainingAttempts: maxAttempts - attempts };
   },
 
   resetAttempts: (userId: number, tx: TxClient) => userSecurityRepository.resetAttempts(userId, tx),

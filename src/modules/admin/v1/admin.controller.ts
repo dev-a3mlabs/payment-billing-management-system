@@ -40,6 +40,20 @@ export const adminController = {
     sendSuccess(res, { message: 'Agent permissions updated successfully', data });
   },
 
+  getAgentSessions: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const data = await adminService.getAgentSessions(req.params.uuid as string, user);
+
+    sendSuccess(res, { message: 'Agent sessions retrieved successfully', data });
+  },
+
+  revokeAgentSessions: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    await adminService.revokeAgentSessions(req.params.uuid as string, user);
+
+    sendSuccess(res, { message: 'Agent logged out from all devices successfully' });
+  },
+
   changeAgentStatus: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
     await adminService.changeAgentStatus(req.params.uuid as string, req.body, user, getClientInfo(req));

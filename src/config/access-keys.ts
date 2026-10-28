@@ -1,6 +1,8 @@
 import { AccessKind, AccessValueType, Role } from '../generated/prisma/enums.js';
 
 export const ACCESS_KEYS = {
+  deviceLimitEnabled: 'auth.device_limit.enabled',
+  deviceLimitMax: 'auth.device_limit.max_devices',
   lockoutEnabled: 'auth.lockout.enabled',
   lockoutMaxAttempts: 'auth.lockout.max_attempts',
   agentCreate: 'user.agent.create',
@@ -24,6 +26,30 @@ export type AccessKeyDefinition = {
 
 // The single source of truth for every access key. Keep sorted by module, then key.
 export const ACCESS_KEY_DEFINITIONS: AccessKeyDefinition[] = [
+  {
+    key: ACCESS_KEYS.deviceLimitEnabled,
+    label: 'Limit logged-in devices',
+    description: 'Limit how many devices can be logged in at the same time',
+    module: 'auth',
+    kind: AccessKind.policy,
+    valueType: AccessValueType.bool,
+    defaultValue: 'false',
+    appliesTo: [Role.admin, Role.agent],
+    editableBy: [Role.super_admin, Role.admin],
+  },
+  {
+    key: ACCESS_KEYS.deviceLimitMax,
+    label: 'Maximum devices',
+    description: 'Devices that can be logged in at the same time',
+    module: 'auth',
+    kind: AccessKind.limit,
+    valueType: AccessValueType.int,
+    defaultValue: '5',
+    appliesTo: [Role.admin, Role.agent],
+    editableBy: [Role.super_admin, Role.admin],
+    min: 1,
+    max: 10,
+  },
   {
     key: ACCESS_KEYS.lockoutEnabled,
     label: 'Lock account after wrong passwords',

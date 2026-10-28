@@ -43,6 +43,8 @@ router.patch(
   validate({ params: userUuidParamsSchema, body: changeUserStatusSchema }),
   superAdminController.changeUserStatus,
 );
+router.get('/users/:uuid/sessions', validate({ params: userUuidParamsSchema }), superAdminController.getUserSessions);
+router.delete('/users/:uuid/sessions', validate({ params: userUuidParamsSchema }), superAdminController.revokeUserSessions);
 router.post('/users/:uuid/unlock', validate({ params: userUuidParamsSchema }), superAdminController.unlockUser);
 router.delete('/users/:uuid', validate({ params: userUuidParamsSchema }), superAdminController.deleteUser);
 

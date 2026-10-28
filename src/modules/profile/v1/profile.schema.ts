@@ -34,4 +34,8 @@ export const updateProfileSchema = z
     { message: 'Country code and mobile number must be sent together', path: ['mobileNumber'] },
   );
 
+export const sessionUuidParamsSchema = z.object({
+  uuid: z.uuid('Session UUID must be a valid UUID'),
+});
+
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

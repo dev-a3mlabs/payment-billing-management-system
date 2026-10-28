@@ -43,6 +43,7 @@ export const authRepository = {
       portal: string;
       ipAddress?: string;
       userAgent?: string;
+      visitorId?: string;
       expiresAt: Date;
     },
     tx: TxClient = prisma,

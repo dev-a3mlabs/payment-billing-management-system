@@ -60,6 +60,18 @@ export const superAdminController = {
     sendSuccess(res, { message: 'User status updated successfully' });
   },
 
+  getUserSessions: async (req: Request, res: Response) => {
+    const data = await superAdminService.getUserSessions(req.params.uuid as string);
+
+    sendSuccess(res, { message: 'User sessions retrieved successfully', data });
+  },
+
+  revokeUserSessions: async (req: Request, res: Response) => {
+    await superAdminService.revokeUserSessions(req.params.uuid as string);
+
+    sendSuccess(res, { message: 'User logged out from all devices successfully' });
+  },
+
   unlockUser: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
     await superAdminService.unlockUser(req.params.uuid as string, user, getClientInfo(req));

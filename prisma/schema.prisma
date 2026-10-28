@@ -154,6 +154,7 @@ model UserSession {
   portal       String    @db.VarChar(30)
   ipAddress    String?   @map("ip_address") @db.VarChar(45)
   userAgent    String?   @map("user_agent") @db.VarChar(512)
+  visitorId    String?   @map("visitor_id") @db.VarChar(64)
   lastActiveAt DateTime  @default(now()) @map("last_active_at")
   expiresAt    DateTime  @map("expires_at")
   revokedAt    DateTime? @map("revoked_at")
@@ -165,6 +166,7 @@ model UserSession {
   loginEvents   LoginEvent[]
 
   @@index([userId, revokedAt])
+  @@index([userId, visitorId])
   @@map("user_sessions")
 }
 

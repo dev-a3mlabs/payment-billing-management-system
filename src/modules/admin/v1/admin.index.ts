@@ -7,6 +7,7 @@ import { profileRoutesFor } from '../../profile/v1/profile.index.js';
 import { adminController } from './admin.controller.js';
 import { updateUserPermissionsSchema } from '../../super-admin/v1/super-admin.schema.js';
 import { agentUuidParamsSchema, changeAgentStatusSchema, createAgentSchema } from './admin.schema.js';
+import { requirePasswordChanged } from '../../../middlewares/require-password-changed.middleware.js';
 
 const router = Router();
 
@@ -15,6 +16,9 @@ router.use('/profile', profileRoutesFor(Portal.admin));
 
 // Every route below needs an admin token.
 router.use(authenticate(Portal.admin));
+
+// Block normal access until the password is changed
+router.use(requirePasswordChanged);
 
 router.get('/permissions', adminController.getPermissions);
 router.post('/agents', validate({ body: createAgentSchema }), adminController.createAgent);
@@ -25,6 +29,8 @@ router.put(
   validate({ params: agentUuidParamsSchema, body: updateUserPermissionsSchema }),
   adminController.updateAgentPermissions,
 );
+router.get('/agents/:uuid/sessions', validate({ params: agentUuidParamsSchema }), adminController.getAgentSessions);
+router.delete('/agents/:uuid/sessions', validate({ params: agentUuidParamsSchema }), adminController.revokeAgentSessions);
 router.patch(
   '/agents/:uuid/status',
   validate({ params: agentUuidParamsSchema, body: changeAgentStatusSchema }),

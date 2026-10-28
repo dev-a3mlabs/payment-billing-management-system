@@ -14,7 +14,10 @@ import { generateRefreshToken, hashToken, signAccessToken } from '../../utils/to
 import { activityLogService } from '../activity-log/activity-log.service.js';
 import { userService } from '../user/user.service.js';
 import { userSecurityService } from '../user-security/user-security.service.js';
+import { sessionRepository } from '../session/session.repository.js';
+import { sessionService } from '../session/session.service.js';
 import { authRepository } from './auth.repository.js';
+import { isDeviceAllowed } from './device-limit.js';
 import { toLoginEventData } from './login-event.js';
 import { checkLoginRisk, LOGIN_VERIFICATION_FAILED } from './login-risk.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
@@ -27,6 +30,7 @@ const DUMMY_PASSWORD_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
 
 const INVALID_CREDENTIALS = 'Invalid credentials';
 const INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
+const ACCOUNT_LOCKED = 'Your account is locked. Please contact your administrator.';
 const TEMP_PASSWORD_USED = 'Your temporary password has already been used. Please contact your admin to reset it.';
 
 // Refresh tokens never outlive their session, so a session lasts at most REFRESH_TOKEN_EXPIRES_DAYS.
@@ -90,9 +94,8 @@ export const authService = {
       throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
     }
 
-    // Same response whether or not this attempt locked the account, so the lock isn't revealed.
     if (!passwordMatches) {
-      await userSecurityService.recordFailedLogin(user, client);
+      const { locked, remainingAttempts } = await userSecurityService.recordFailedLogin(user, client);
       await authRepository.createLoginEvent({
         userId: user.id,
         portal,
@@ -100,10 +103,17 @@ export const authService = {
         blockReason: LOGIN_BLOCK_REASONS.wrongPassword,
         ...toLoginEventData(null, client),
       });
-      throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
+      if (locked) {
+        throw ApiError.forbidden(ACCOUNT_LOCKED, ERROR_CODES.ACCOUNT_LOCKED);
+      }
+      throw ApiError.unauthorized(
+        remainingAttempts === null
+          ? INVALID_CREDENTIALS
+          : `${INVALID_CREDENTIALS}. ${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} left before your account is locked.`,
+        ERROR_CODES.INVALID_CREDENTIALS,
+      );
     }
 
-    // Only told after the correct password, so a locked account can't be discovered by guessing.
     if (user.security?.lockedAt) {
       await authRepository.createLoginEvent({
         userId: user.id,
@@ -112,7 +122,7 @@ export const authService = {
         blockReason: LOGIN_BLOCK_REASONS.accountLocked,
         ...toLoginEventData(null, client),
       });
-      throw ApiError.forbidden('Your account is locked. Please contact your administrator.', ERROR_CODES.ACCOUNT_LOCKED);
+      throw ApiError.forbidden(ACCOUNT_LOCKED, ERROR_CODES.ACCOUNT_LOCKED);
     }
 
     // Same message as a wrong password, so other portals' accounts aren't revealed.
@@ -132,33 +142,31 @@ export const authService = {
       },
     );
 
-    // Checked before any login writes, so a blocked login doesn't burn the temp password.
-    const block = checkLoginRisk(lookup);
-    if (block) {
-      await guardEventReuse(() =>
+    const recordBlockedLogin = (blockReason: string) =>
+      guardEventReuse(() =>
         authRepository.createLoginEvent({
           userId: user.id,
           portal,
           status: LoginStatus.blocked,
-          blockReason: block.reason,
+          blockReason,
           ...toLoginEventData(lookup.event, client),
         }),
       );
+
+    // Checked before any login writes, so a blocked login doesn't burn the temp password.
+    const block = checkLoginRisk(lookup);
+    if (block) {
+      await recordBlockedLogin(block.reason);
       throw ApiError.forbidden(block.message, ERROR_CODES.LOGIN_BLOCKED);
     }
 
-    // The temporary password works for one login only.
-    if (user.mustChangePassword && user.tempPasswordUsedAt) {
-      throw ApiError.forbidden(TEMP_PASSWORD_USED, ERROR_CODES.TEMP_PASSWORD_USED);
-    }
+    const visitorId = lookup.event?.identification.visitor_id;
 
     // All login writes succeed or fail together, so a rejected login never burns the temp password.
     const session = await guardEventReuse(() =>
       withTransaction(async (tx) => {
-        // Only marks it if still unused, so two parallel logins can't both use the same temp password.
-        if (user.mustChangePassword && (await authRepository.markTempPasswordUsed(user.id, tx)).count === 0) {
-          throw ApiError.forbidden(TEMP_PASSWORD_USED, ERROR_CODES.TEMP_PASSWORD_USED);
-        }
+        // Returns before any write, so a blocked login changes nothing.
+        if (visitorId && !(await isDeviceAllowed(user, visitorId, tx))) return null;
 
         await authRepository.updateLastLogin(user.id, tx);
 
@@ -166,11 +174,17 @@ export const authService = {
           await userSecurityService.resetAttempts(user.id, tx);
         }
 
+        // One session per device: a new login replaces the old session on the same browser.
+        if (visitorId) {
+          await sessionRepository.revokeDevice(user.id, visitorId, SESSION_REVOKE_REASONS.sameDeviceLogin, tx);
+        }
+
         const created = await authRepository.createSession(
           {
             userId: user.id,
             portal,
             ...client,
+            visitorId,
             expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000),
           },
           tx,
@@ -190,6 +204,14 @@ export const authService = {
         return created;
       }),
     );
+
+    if (!session) {
+      await recordBlockedLogin(LOGIN_BLOCK_REASONS.deviceLimit);
+      throw ApiError.forbidden(
+        'You are logged in on the maximum number of devices. Please log out from another device and try again.',
+        ERROR_CODES.DEVICE_LIMIT_REACHED,
+      );
+    }
 
     return {
       mustChangePassword: user.mustChangePassword,
@@ -219,7 +241,7 @@ export const authService = {
     }
 
     if (
-      session.revokedAt ||
+      !sessionService.isActive(session) ||
       stored.expiresAt < new Date() ||
       session.portal !== portal ||
       !userService.isActive(user) ||

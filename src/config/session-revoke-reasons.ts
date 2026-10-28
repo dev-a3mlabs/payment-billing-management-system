@@ -5,6 +5,9 @@ export const SESSION_REVOKE_REASONS = {
   accountInactive: 'account_inactive',
   accountSuspended: 'account_suspended',
   accountDeleted: 'account_deleted',
+  sameDeviceLogin: 'same_device_login',
+  revokedByUser: 'revoked_by_user',
+  revokedByAdmin: 'revoked_by_admin',
 } as const;
 
 export type SessionRevokeReason = (typeof SESSION_REVOKE_REASONS)[keyof typeof SESSION_REVOKE_REASONS];

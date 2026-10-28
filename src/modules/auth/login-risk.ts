@@ -9,6 +9,8 @@ export type LoginBlock = { reason: string; message: string };
 // Messages never name the provider or the exact check; the reason is only stored internally.
 export const LOGIN_VERIFICATION_FAILED = 'We could not verify your login. Please refresh the page and try again.';
 
+const MIN_CONFIDENCE_SCORE = 0.9;
+
 // Returns why the login must be blocked, or null if it is allowed. Add new rules here.
 export const checkLoginRisk = ({ event, failed }: FingerprintLookup): LoginBlock | null => {
   if (failed) {
@@ -21,6 +23,11 @@ export const checkLoginRisk = ({ event, failed }: FingerprintLookup): LoginBlock
   // A real browser always sends a valid event, so a missing one means the request was tampered with.
   if (!event) {
     return { reason: LOGIN_BLOCK_REASONS.eventNotFound, message: LOGIN_VERIFICATION_FAILED };
+  }
+
+  // A low score means the device may be confused with another one, which would break device limits.
+  if (event.identification.confidence.score < MIN_CONFIDENCE_SCORE) {
+    return { reason: LOGIN_BLOCK_REASONS.lowConfidence, message: LOGIN_VERIFICATION_FAILED };
   }
 
   // 'good' bots (e.g. search crawlers) are still automation and have no reason to log in.

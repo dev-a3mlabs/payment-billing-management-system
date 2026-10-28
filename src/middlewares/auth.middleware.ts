@@ -3,6 +3,7 @@ import { ERROR_CODES } from '../config/error-codes.js';
 import { ROLE_PORTAL, type Portal } from '../config/portals.js';
 import type { Role } from '../generated/prisma/enums.js';
 import { authRepository } from '../modules/auth/auth.repository.js';
+import { sessionService } from '../modules/session/session.service.js';
 import { userService } from '../modules/user/user.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { verifyAccessToken, type AccessTokenPayload } from '../utils/token.js';
@@ -13,6 +14,7 @@ export type AuthUser = {
   role: Role;
   portal: Portal;
   sessionId: number;
+  mustChangePassword: boolean;
 };
 
 // Request on routes behind authenticate(), where user is always set.
@@ -43,8 +45,7 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
   const session = await authRepository.findSessionByUuid(payload.sid);
   if (
     !session ||
-    session.revokedAt ||
-    session.expiresAt < new Date() ||
+    !sessionService.isActive(session) ||
     session.user.uuid !== payload.sub ||
     !userService.isActive(session.user)
   ) {
@@ -56,7 +57,14 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
     throw ApiError.forbidden();
   }
 
-  (req as AuthRequest).user = { id: user.id, uuid: user.uuid, role: user.role, portal, sessionId: session.id };
+  (req as AuthRequest).user = { 
+    id: user.id, 
+    uuid: user.uuid, 
+    role: user.role, 
+    portal, 
+    sessionId: session.id,
+    mustChangePassword: user.mustChangePassword
+  };
   next();
 };
 
