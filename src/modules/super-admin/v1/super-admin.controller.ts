@@ -30,6 +30,15 @@ export const superAdminController = {
     sendSuccess(res, { message: 'Admins retrieved successfully', data: admins });
   },
 
+  listAdminAgents: async (req: Request, res: Response) => {
+  const { uuid } = req.params as { uuid: string };
+  const { page } = req.query as unknown as { page: number }; // already coerced by the validate middleware
+
+  const result = await superAdminService.listAdminAgents(uuid, page);
+
+  sendSuccess(res, { message: 'Agents retrieved successfully', data: result });
+},
+
   listPermissions: (_req: Request, res: Response) => {
     sendSuccess(res, { message: 'Permissions retrieved successfully', data: superAdminService.listPermissions() });
   },

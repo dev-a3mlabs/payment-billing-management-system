@@ -11,6 +11,9 @@ import { userService } from '../user/user.service.js';
 import type { UpdateUserPermissionsInput } from '../super-admin/v1/super-admin.schema.js';
 import type { ChangeAgentStatusInput, CreateAgentInput } from './v1/admin.schema.js';
 
+
+const AGENTS_PAGE_SIZE = 10;
+
 const findOwnAgent = async (uuid: string, admin: AuthUser) => {
   const agent = await userRepository.findByUuid(uuid);
   if (!agent || agent.parentId !== admin.id || agent.status === UserStatus.deleted) {
@@ -78,5 +81,23 @@ export const adminService = {
     }
 
     await userService.changeStatus(agent, status, admin.id, client);
+  },
+
+
+  getAgents: async (admin: AuthUser, page: number) => {
+    const [agents, total] = await Promise.all([
+      userRepository.findAgentsByParent(admin.id, page, AGENTS_PAGE_SIZE),
+      userRepository.countAgentsByParent(admin.id),
+    ]);
+
+    return {
+      items: agents, // the repository `select` already returns only safe fields
+      pagination: {
+        page,
+        pageSize: AGENTS_PAGE_SIZE,
+        totalItems: total,
+        totalPages: Math.max(1, Math.ceil(total / AGENTS_PAGE_SIZE)),
+      },
+    };
   },
 };

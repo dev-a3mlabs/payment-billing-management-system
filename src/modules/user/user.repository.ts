@@ -1,6 +1,6 @@
 import { prisma } from '../../db/prisma.js';
 import type { TxClient } from '../../db/transaction.js';
-import { UserStatus, type Role } from '../../generated/prisma/enums.js';
+import { UserStatus, Role } from '../../generated/prisma/enums.js';
 
 export const userRepository = {
   isUsernameTaken: async (username: string, tx: TxClient = prisma) =>
@@ -30,6 +30,8 @@ export const userRepository = {
         firstName: true,
         lastName: true,
         email: true,
+        countryCode: true,
+        mobileNumber: true,
         security: { select: { failedLoginAttempts: true, lockedAt: true } },
       },
     }),
@@ -44,8 +46,35 @@ export const userRepository = {
   lockById: (id: number, tx: TxClient) => tx.user.update({ where: { id }, data: { updatedAt: new Date() }, select: { id: true } }),
 
   findChildren: (parentId: number, tx: TxClient) =>
-    tx.user.findMany({ where: { parentId, status: { not: UserStatus.deleted } }, select: { id: true, status: true } }),
+    tx.user.findMany({ where: { parentId, status: { not: UserStatus.deleted } }, select: { id: true, status: true, uuid: true, username: true, firstName: true, lastName: true, email: true, createdAt: true, updatedAt: true } }),
 
   countChildren: (parentId: number, tx: TxClient = prisma) =>
     tx.user.count({ where: { parentId, status: { not: UserStatus.deleted } } }),
+
+  countAgentsByParent: (parentId: number, tx: TxClient = prisma) =>
+  tx.user.count({
+    where: { parentId, role: Role.agent, status: { not: UserStatus.deleted } },
+  }),
+
+  findAgentsByParent: (parentId: number, page: number, pageSize: number,tx: TxClient = prisma) =>
+  tx.user.findMany({
+    where: {
+      parentId,
+      role: Role.agent,
+      status: { not: UserStatus.deleted },
+    },
+    select: {
+      uuid: true,
+      username: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+  }),
 };

@@ -14,6 +14,7 @@ import type { ChangeUserStatusInput, CreateUserInput, UpdateUserPermissionsInput
 
 const MAX_USERNAME_LENGTH = 30;
 const SUGGESTION_COUNT = 3;
+const PAGE_SIZE = 10;
 
 // Every suffix ends with a digit, so a candidate never ends with a dot.
 const buildUsernameCandidates = (username: string) => {
@@ -71,6 +72,33 @@ export const superAdminService = {
 
   listAdmins: async (requester: AuthUser) => {
     return userRepository.findAllByRole(Role.admin);
+  },
+
+
+  listAgents: async (requester: AuthUser) => {
+    return userRepository.findAllByRole(Role.agent);
+  },
+
+  listAdminAgents: async (adminUuid: string, page: number) => {
+    const admin = await userRepository.findByUuid(adminUuid);
+    if (!admin || admin.role !== Role.admin || admin.status === UserStatus.deleted) {
+      throw ApiError.notFound('Admin not found');
+    }
+
+    const [agents, total] = await Promise.all([
+      userRepository.findAgentsByParent(admin.id, page, PAGE_SIZE),
+      userRepository.countAgentsByParent(admin.id),
+    ]);
+
+    return {
+      agents,
+      pagination: {
+        page,
+        pageSize: PAGE_SIZE,
+        totalItems: total,
+        totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+      },
+    };
   },
 
   listPermissions: () => accessService.listDefinitions(),

@@ -11,6 +11,7 @@ const envSchema = z.object({
   REFRESH_TOKEN_EXPIRES_DAYS: z.coerce.number().int().positive().default(15),
   FINGERPRINT_SECRET_API_KEY: z.string().min(1, 'FINGERPRINT_SECRET_API_KEY is required'),
   FINGERPRINT_REGION: z.enum(['global', 'eu', 'ap']).default('global'),
+  CLOUDFLARE_SECRET_API_KEY: z.string().min(1, 'CLOUDFLARE_SECRET_API_KEY is required'),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -1,5 +1,6 @@
 import { LOGIN_BLOCK_REASONS } from '../../config/login-block-reasons.js';
 import type { FingerprintEvent } from '../../integrations/fingerprint/fingerprint.types.js';
+import { logger } from '../../utils/logger.js';
 
 // failed: the Fingerprint API errored or timed out. event null: Fingerprint doesn't know this eventId.
 export type FingerprintLookup = { event: FingerprintEvent | null; failed: boolean };
@@ -35,12 +36,13 @@ export const checkLoginRisk = ({ event, failed }: FingerprintLookup): LoginBlock
     return { reason: LOGIN_BLOCK_REASONS.bot, message: LOGIN_VERIFICATION_FAILED };
   }
 
-  if (event.vpn === true) {
-    return {
-      reason: LOGIN_BLOCK_REASONS.vpn,
-      message: 'Login through a VPN is not allowed. Please turn off your VPN and try again.',
-    };
-  }
+  // if (event.vpn === true) {
+  //   logger.warn('Login attempt through a VPN was blocked.', event);
+  //   return {
+  //     reason: LOGIN_BLOCK_REASONS.vpn,
+  //     message: 'Login through a VPN is not allowed. Please turn off your VPN and try again.',
+  //   };
+  // }
 
   if (event.incognito === true) {
     return {

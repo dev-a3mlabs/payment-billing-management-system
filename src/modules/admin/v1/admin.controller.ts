@@ -60,4 +60,15 @@ export const adminController = {
 
     sendSuccess(res, { message: 'Agent status updated successfully' });
   },
+
+  getAgents: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const { page } = req.query as unknown as { page: number }; // coerced by validate
+
+    const data = await adminService.getAgents(user, page);
+
+    sendSuccess(res, { message: 'Agents retrieved successfully', data });
+  },
+
+  
 };

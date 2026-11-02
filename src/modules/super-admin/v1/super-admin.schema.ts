@@ -55,6 +55,12 @@ export const changeUserStatusSchema = z.object({
   }),
 });
 
+
+export const listAgentsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserPermissionsInput = z.infer<typeof updateUserPermissionsSchema>;
 export type ChangeUserStatusInput = z.infer<typeof changeUserStatusSchema>;
+export type ListAgentsQuery = z.infer<typeof listAgentsQuerySchema>;

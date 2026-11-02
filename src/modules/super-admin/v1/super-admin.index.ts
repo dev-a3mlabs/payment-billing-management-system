@@ -9,6 +9,7 @@ import {
   changeUserStatusSchema,
   checkUsernameSchema,
   createUserSchema,
+  listAgentsQuerySchema,
   updateUserPermissionsSchema,
   userPermissionParamsSchema,
   userUuidParamsSchema,
@@ -26,6 +27,7 @@ router.get('/users/check-username', validate({ query: checkUsernameSchema }), su
 router.post('/users', validate({ body: createUserSchema }), superAdminController.createUser);
 router.get('/temp-password', superAdminController.generateTempPassword);
 router.get('/admins', superAdminController.listAdmins);
+router.get('/:uuid/agents', validate({ params: userUuidParamsSchema, query: listAgentsQuerySchema }), superAdminController.listAdminAgents);
 router.get('/permissions', superAdminController.listPermissions);
 router.get('/users/:uuid/permissions', validate({ params: userUuidParamsSchema }), superAdminController.getUserPermissions);
 router.put(

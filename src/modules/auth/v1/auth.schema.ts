@@ -4,6 +4,7 @@ export const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
   eventId: z.string().trim().min(1, 'Event ID is required'),
+  IdentityToken: z.string().trim().min(1, 'Identity token is required').optional(),
 });
 
 export const refreshTokenSchema = z.object({

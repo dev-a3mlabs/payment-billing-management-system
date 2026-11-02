@@ -23,6 +23,7 @@ import { checkLoginRisk, LOGIN_VERIFICATION_FAILED } from './login-risk.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import type { ChangePasswordInput, LoginInput } from './v1/auth.schema.js';
 import { fingerprintService } from '../../integrations/fingerprint/fingerprint.service.js';
+import { cloudflareService } from '../../integrations/cloudflare/cloudflare.service.js';
 import { logger } from '../../utils/logger.js';
 
 // Compared against when the username doesn't exist, so the response takes the same time either way.
@@ -32,6 +33,8 @@ const INVALID_CREDENTIALS = 'Invalid credentials';
 const INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 const ACCOUNT_LOCKED = 'Your account is locked. Please contact your administrator.';
 const TEMP_PASSWORD_USED = 'Your temporary password has already been used. Please contact your admin to reset it.';
+export const LOGIN_TEMPORARILY_UNAVAILABLE =
+  'We could not complete your login right now. Please try again later.';
 
 // Refresh tokens never outlive their session, so a session lasts at most REFRESH_TOKEN_EXPIRES_DAYS.
 const issueTokens = async (user: User, session: UserSession) => {
@@ -85,7 +88,24 @@ const guardEventReuse = async <T>(fn: () => Promise<T>) => {
 };
 
 export const authService = {
-  login: async ({ username, password, eventId }: LoginInput, portal: Portal, client: ClientInfo) => {
+  login: async ({ username, password, eventId, IdentityToken }: LoginInput, portal: Portal, client: ClientInfo) => {
+
+
+    if (IdentityToken) {
+      
+      const captcha = await cloudflareService.verifyTurnstile(IdentityToken);
+
+      if (!captcha.ok) {
+        // The real reason stays in the server log only.
+        logger.warn('Turnstile check failed:', captcha.reason, captcha.errorCodes);
+
+        if (captcha.reason === 'verification-unavailable') {
+          throw ApiError.forbidden(LOGIN_TEMPORARILY_UNAVAILABLE, ERROR_CODES.CAPTCHA_UNAVAILABLE);
+        }
+        throw ApiError.forbidden(LOGIN_VERIFICATION_FAILED, ERROR_CODES.CAPTCHA_FAILED);
+      }
+    }
+
     const user = await authRepository.findUserByUsername(username);
 
     const passwordMatches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
@@ -223,6 +243,9 @@ export const authService = {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        countryCode: user.countryCode,
+        mobileNumber: user.mobileNumber,
+        status: user.status,
       },
     };
   },
