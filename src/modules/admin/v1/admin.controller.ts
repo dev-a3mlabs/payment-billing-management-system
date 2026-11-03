@@ -34,7 +34,7 @@ export const adminController = {
 
   updateAgentPermissions: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
-    const data = await adminService.updateAgentPermissions(req.params.uuid as string, req.body, user);
+    const data = await adminService.updateAgentPermissions(req.params.uuid as string, req.body, user, getClientInfo(req));
 
     sendSuccess(res, { message: 'Agent permissions updated successfully', data });
   },

@@ -51,7 +51,12 @@ export const superAdminController = {
 
   updateUserPermissions: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
-    const data = await superAdminService.updateUserPermissions(req.params.uuid as string, req.body, user);
+    const data = await superAdminService.updateUserPermissions(
+      req.params.uuid as string,
+      req.body,
+      user,
+      getClientInfo(req),
+    );
 
     sendSuccess(res, { message: 'User permissions updated successfully', data });
   },
@@ -60,6 +65,31 @@ export const superAdminController = {
     const data = await superAdminService.resetUserPermission(req.params.uuid as string, req.params.key as string);
 
     sendSuccess(res, { message: 'User permission reset successfully', data });
+  },
+
+  unlockUserPermission: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const data = await superAdminService.unlockUserPermission(
+      req.params.uuid as string,
+      req.params.key as string,
+      user,
+      getClientInfo(req),
+    );
+
+    sendSuccess(res, { message: 'User permission unlocked successfully', data });
+  },
+
+  getUserGrants: async (req: Request, res: Response) => {
+    const data = await superAdminService.getUserGrants(req.params.uuid as string);
+
+    sendSuccess(res, { message: 'User grants retrieved successfully', data });
+  },
+
+  updateUserGrants: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const data = await superAdminService.updateUserGrants(req.params.uuid as string, req.body, user, getClientInfo(req));
+
+    sendSuccess(res, { message: 'User grants updated successfully', data });
   },
 
   changeUserStatus: async (req: Request, res: Response) => {

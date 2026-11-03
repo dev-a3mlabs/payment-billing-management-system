@@ -22,6 +22,15 @@ const findOwnAgent = async (uuid: string, admin: AuthUser) => {
   return agent;
 };
 
+// An admin can only change keys the super admin granted them, and only while the value isn't locked.
+const getAgentValues = async (agent: { id: number; role: Role }, admin: AuthUser) => {
+  const [values, grantedKeys] = await Promise.all([
+    accessService.getUserValues(agent, admin.role),
+    accessService.getGrantedKeys(admin),
+  ]);
+  return values.map((value) => ({ ...value, editable: grantedKeys.includes(value.key) && !value.locked }));
+};
+
 export const adminService = {
   getPermissions: () =>
     accessService.listDefinitions().map((definition) => ({
@@ -31,7 +40,7 @@ export const adminService = {
     })),
 
   getAgentPermissions: async (agentUuid: string, admin: AuthUser) =>
-    accessService.getUserValues(await findOwnAgent(agentUuid, admin), admin.role),
+    getAgentValues(await findOwnAgent(agentUuid, admin), admin),
 
   getAgentSessions: async (agentUuid: string, admin: AuthUser) =>
     sessionService.list((await findOwnAgent(agentUuid, admin)).id),
@@ -40,10 +49,21 @@ export const adminService = {
     await sessionService.revokeAll((await findOwnAgent(agentUuid, admin)).id);
   },
 
-  updateAgentPermissions: async (agentUuid: string, { values }: UpdateUserPermissionsInput, admin: AuthUser) => {
+  updateAgentPermissions: async (
+    agentUuid: string,
+    { values }: UpdateUserPermissionsInput,
+    admin: AuthUser,
+    client: ClientInfo,
+  ) => {
     const agent = await findOwnAgent(agentUuid, admin);
-    await accessService.setUserValues(agent, values, admin);
-    return accessService.getUserValues(agent, admin.role);
+
+    const editableKeys = (await getAgentValues(agent, admin)).filter((value) => value.editable).map((value) => value.key);
+    if (Object.keys(values).some((key) => !editableKeys.includes(key))) {
+      throw ApiError.forbidden('You do not have permission to change these permissions');
+    }
+
+    await accessService.setUserValues(agent, values, admin, client);
+    return getAgentValues(agent, admin);
   },
 
   getAgentQuota: async (admin: AuthUser) => {

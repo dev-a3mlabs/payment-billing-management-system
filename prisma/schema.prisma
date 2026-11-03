@@ -55,6 +55,8 @@ model User {
   accessValues      AccessUserValue[] @relation("AccessUserValueUser")
   accessUserUpdates AccessUserValue[] @relation("AccessUserValueUpdatedBy")
   accessRoleUpdates AccessRoleValue[]
+  accessGrants      AccessGrant[]     @relation("AccessGrantUser")
+  accessGrantsGiven AccessGrant[]     @relation("AccessGrantGrantedBy")
 
   tempPasswordUsedAt DateTime? @map("temp_password_used_at")
   passwordChangedAt  DateTime? @map("password_changed_at")
@@ -108,6 +110,7 @@ model AccessKey {
 
   roleValues AccessRoleValue[]
   userValues AccessUserValue[]
+  grants     AccessGrant[]
 
   @@index([module])
   @@map("access_keys")
@@ -135,6 +138,7 @@ model AccessUserValue {
   accessKeyId Int       @map("access_key_id")
   accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
   value       String    @db.VarChar(255)
+  locked      Boolean   @default(false)
   updatedById Int       @map("updated_by_id")
   updatedBy   User      @relation("AccessUserValueUpdatedBy", fields: [updatedById], references: [id])
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -144,6 +148,22 @@ model AccessUserValue {
   @@index([accessKeyId])
   @@index([updatedById])
   @@map("access_user_values")
+}
+
+// Keys an admin may manage for their agents, given by the super admin.
+model AccessGrant {
+  userId      Int       @map("user_id")
+  user        User      @relation("AccessGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  accessKeyId Int       @map("access_key_id")
+  accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  grantedById Int       @map("granted_by_id")
+  grantedBy   User      @relation("AccessGrantGrantedBy", fields: [grantedById], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@id([userId, accessKeyId])
+  @@index([accessKeyId])
+  @@index([grantedById])
+  @@map("access_grants")
 }
 
 model UserSession {

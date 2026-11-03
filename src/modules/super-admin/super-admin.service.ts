@@ -10,7 +10,12 @@ import { sessionService } from '../session/session.service.js';
 import { userSecurityService } from '../user-security/user-security.service.js';
 import { superAdminRepository } from './super-admin.repository.js';
 import type { ClientInfo } from '../../utils/request.js';
-import type { ChangeUserStatusInput, CreateUserInput, UpdateUserPermissionsInput } from './v1/super-admin.schema.js';
+import type {
+  ChangeUserStatusInput,
+  CreateUserInput,
+  UpdateUserGrantsInput,
+  UpdateUserPermissionsInput,
+} from './v1/super-admin.schema.js';
 
 const MAX_USERNAME_LENGTH = 30;
 const SUGGESTION_COUNT = 3;
@@ -32,6 +37,14 @@ const MANAGED_ROLES: Role[] = [Role.admin, Role.agent];
 const findManagedUser = async (uuid: string) => {
   const user = await userRepository.findByUuid(uuid);
   if (!user || !MANAGED_ROLES.includes(user.role) || user.status === UserStatus.deleted) {
+    throw ApiError.notFound('User not found');
+  }
+  return user;
+};
+
+const findManagedAdmin = async (uuid: string) => {
+  const user = await findManagedUser(uuid);
+  if (user.role !== Role.admin) {
     throw ApiError.notFound('User not found');
   }
   return user;
@@ -105,9 +118,14 @@ export const superAdminService = {
 
   getUserPermissions: async (uuid: string) => accessService.getUserValues(await findManagedUser(uuid)),
 
-  updateUserPermissions: async (uuid: string, { values }: UpdateUserPermissionsInput, superAdmin: AuthUser) => {
+  updateUserPermissions: async (
+    uuid: string,
+    { values }: UpdateUserPermissionsInput,
+    superAdmin: AuthUser,
+    client: ClientInfo,
+  ) => {
     const user = await findManagedUser(uuid);
-    await accessService.setUserValues(user, values, superAdmin);
+    await accessService.setUserValues(user, values, superAdmin, client);
     return accessService.getUserValues(user);
   },
 
@@ -115,6 +133,20 @@ export const superAdminService = {
     const user = await findManagedUser(uuid);
     await accessService.resetUserValue(user, key, Role.super_admin);
     return accessService.getUserValues(user);
+  },
+
+  unlockUserPermission: async (uuid: string, key: string, superAdmin: AuthUser, client: ClientInfo) => {
+    const user = await findManagedUser(uuid);
+    await accessService.unlockUserValue(user, key, superAdmin.id, client);
+    return accessService.getUserValues(user);
+  },
+
+  getUserGrants: async (uuid: string) => accessService.getGrants(await findManagedAdmin(uuid)),
+
+  updateUserGrants: async (uuid: string, { keys }: UpdateUserGrantsInput, superAdmin: AuthUser, client: ClientInfo) => {
+    const admin = await findManagedAdmin(uuid);
+    await accessService.setGrants(admin, keys, superAdmin, client);
+    return accessService.getGrants(admin);
   },
 
   changeUserStatus: async (uuid: string, { status }: ChangeUserStatusInput, superAdmin: AuthUser, client: ClientInfo) =>

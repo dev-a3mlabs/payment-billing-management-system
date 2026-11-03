@@ -10,6 +10,7 @@ import {
   checkUsernameSchema,
   createUserSchema,
   listAgentsQuerySchema,
+  updateUserGrantsSchema,
   updateUserPermissionsSchema,
   userPermissionParamsSchema,
   userUuidParamsSchema,
@@ -39,6 +40,17 @@ router.delete(
   '/users/:uuid/permissions/:key',
   validate({ params: userPermissionParamsSchema }),
   superAdminController.resetUserPermission,
+);
+router.delete(
+  '/users/:uuid/permissions/:key/lock',
+  validate({ params: userPermissionParamsSchema }),
+  superAdminController.unlockUserPermission,
+);
+router.get('/users/:uuid/grants', validate({ params: userUuidParamsSchema }), superAdminController.getUserGrants);
+router.put(
+  '/users/:uuid/grants',
+  validate({ params: userUuidParamsSchema, body: updateUserGrantsSchema }),
+  superAdminController.updateUserGrants,
 );
 router.patch(
   '/users/:uuid/status',

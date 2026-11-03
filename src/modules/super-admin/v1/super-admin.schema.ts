@@ -49,6 +49,13 @@ export const updateUserPermissionsSchema = z.object({
     .refine((values) => Object.keys(values).length > 0, 'At least one permission is required'),
 });
 
+// Replaces the admin's whole set of grants; an empty array removes them all.
+export const updateUserGrantsSchema = z.object({
+  keys: z
+    .array(z.string().min(1, 'Permission key is required'), 'Keys must be an array of permission keys')
+    .refine((keys) => new Set(keys).size === keys.length, 'Keys must be unique'),
+});
+
 export const changeUserStatusSchema = z.object({
   status: z.enum([UserStatus.active, UserStatus.inactive, UserStatus.suspended], {
     error: `Status must be one of: ${UserStatus.active}, ${UserStatus.inactive}, ${UserStatus.suspended}`,
@@ -62,5 +69,6 @@ export const listAgentsQuerySchema = z.object({
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserPermissionsInput = z.infer<typeof updateUserPermissionsSchema>;
+export type UpdateUserGrantsInput = z.infer<typeof updateUserGrantsSchema>;
 export type ChangeUserStatusInput = z.infer<typeof changeUserStatusSchema>;
 export type ListAgentsQuery = z.infer<typeof listAgentsQuerySchema>;

@@ -1,4 +1,7 @@
 export const ACTIVITY_ACTIONS = {
+  accessGrantChange: 'access.grant.change',
+  accessValueUnlock: 'access.value.unlock',
+  accessValueUpdate: 'access.value.update',
   accountLocked: 'auth.account.locked',
   accountUnlocked: 'auth.account.unlocked',
   tokenReuseDetected: 'auth.token.reuse_detected',
