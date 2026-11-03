@@ -12,9 +12,8 @@ export const adminController = {
     sendSuccess(res, { statusCode: 201, message: 'Agent created successfully', data: agent });
   },
 
-  getPermissions: async (req: Request, res: Response) => {
-    const { user } = req as AuthRequest;
-    const data = await adminService.getPermissions(user);
+  getPermissions: (_req: Request, res: Response) => {
+    const data = adminService.getPermissions();
 
     sendSuccess(res, { message: 'Permissions retrieved successfully', data });
   },
@@ -70,5 +69,10 @@ export const adminController = {
     sendSuccess(res, { message: 'Agents retrieved successfully', data });
   },
 
-  
+  deleteAgent: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    await adminService.deleteAgent(req.params.uuid as string, user, getClientInfo(req));
+
+    sendSuccess(res, { message: 'Agent deleted successfully' });
+  }
 };

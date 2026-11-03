@@ -23,7 +23,12 @@ const findOwnAgent = async (uuid: string, admin: AuthUser) => {
 };
 
 export const adminService = {
-  getPermissions: (admin: AuthUser) => accessService.getUserValues(admin),
+  getPermissions: () =>
+    accessService.listDefinitions().map((definition) => ({
+      ...definition,
+      appliesTo: definition.appliesTo.filter((role) => role !== Role.super_admin),
+      editableBy: definition.editableBy.filter((role) => role !== Role.super_admin),
+    })),
 
   getAgentPermissions: async (agentUuid: string, admin: AuthUser) =>
     accessService.getUserValues(await findOwnAgent(agentUuid, admin), admin.role),
@@ -99,5 +104,20 @@ export const adminService = {
         totalPages: Math.max(1, Math.ceil(total / AGENTS_PAGE_SIZE)),
       },
     };
+  },
+
+
+
+  deleteAgent: async (agentUuid: string, admin: AuthUser, client: ClientInfo) => {
+    if (!(await accessService.hasPermission(admin, ACCESS_KEYS.agentDelete))) {
+      throw ApiError.forbidden('You do not have permission to delete agents');
+    }
+
+    const agent = await findOwnAgent(agentUuid, admin);
+    if (agent.status === UserStatus.suspended) {
+      throw ApiError.forbidden('You cannot delete this agent');
+    }
+
+    await userService.changeStatus(agent, UserStatus.deleted, admin.id, client);
   },
 };

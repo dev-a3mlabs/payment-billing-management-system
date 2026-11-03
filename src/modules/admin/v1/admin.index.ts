@@ -37,5 +37,6 @@ router.patch(
   validate({ params: agentUuidParamsSchema, body: changeAgentStatusSchema }),
   adminController.changeAgentStatus,
 );
+router.delete('/agents/:uuid', validate({ params: agentUuidParamsSchema }), adminController.deleteAgent);
 
 export default router;
