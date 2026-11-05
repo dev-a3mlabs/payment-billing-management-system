@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { ACCESS_KEYS } from '../../config/access-keys.js';
 import { ACTIVITY_ACTIONS } from '../../config/activity-actions.js';
 import { ERROR_CODES } from '../../config/error-codes.js';
+import { MFA_METHODS, type MfaMethod } from '../../config/mfa-methods.js';
 import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
 import { withTransaction } from '../../db/transaction.js';
 import { Prisma } from '../../generated/prisma/client.js';
@@ -23,6 +24,7 @@ import type { DisableMfaInput } from '../profile/v1/profile.schema.js';
 
 const RECOVERY_CODE_COUNT = 10;
 const CHALLENGE_EXPIRES_MS = 5 * 60 * 1000;
+const PENDING_SECRET_REUSE_MS = 10 * 60 * 1000;
 
 const INVALID_CODE = 'Invalid code';
 
@@ -40,16 +42,18 @@ const isRequired = async (user: MfaUser) =>
 
 const isEnabled = async (userId: number) => Boolean((await mfaRepository.findByUserId(userId))?.enabledAt);
 
-// Checks a 6-digit app code or a one-time recovery code, and uses it up.
-const verifyCode = async (userId: number, code: string) => {
+// Checks a 6-digit app code or a one-time recovery code and uses it up; returns which one matched, or null.
+const verifyCode = async (userId: number, code: string): Promise<MfaMethod | null> => {
   const mfa = await mfaRepository.findByUserId(userId);
-  if (!mfa?.enabledAt) return false;
+  if (!mfa?.enabledAt) return null;
 
   if (/^\d{6}$/.test(code)) {
     const step = matchTotp(decrypt(mfa.secretEncrypted), code);
-    return step !== null && (await mfaRepository.useStep(userId, step)).count > 0;
+    return step !== null && (await mfaRepository.useStep(userId, step)).count > 0 ? MFA_METHODS.totp : null;
   }
-  return (await mfaRepository.useRecoveryCode(userId, hashRecoveryCode(code))).count > 0;
+  return (await mfaRepository.useRecoveryCode(userId, hashRecoveryCode(code))).count > 0
+    ? MFA_METHODS.recoveryCode
+    : null;
 };
 
 export const mfaService = {
@@ -62,33 +66,40 @@ export const mfaService = {
     return { enabled, required };
   },
 
-  // Starting again before enabling replaces the old secret, so a wrong scan can simply be redone.
+  // A recent pending secret is returned again, so a repeated call (double click, refresh, a screen
+  // that renders twice) can't replace the secret behind a QR code the user already scanned.
   setup: async (user: AuthUser, client: ClientInfo) => {
-    if (await isEnabled(user.id)) {
+    const mfa = await mfaRepository.findByUserId(user.id);
+    if (mfa?.enabledAt) {
       throw ApiError.conflict('MFA is already enabled');
     }
 
-    const secret = createTotpSecret();
-    try {
-      await mfaRepository.savePendingSecret(user.id, encrypt(secret));
-    } catch (err) {
-      // Another setup request for this user created the row at the same moment.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        throw ApiError.conflict('MFA setup is already in progress. Please try again.');
+    let secret: string;
+    if (mfa && Date.now() - mfa.updatedAt.getTime() < PENDING_SECRET_REUSE_MS) {
+      secret = decrypt(mfa.secretEncrypted);
+    } else {
+      secret = createTotpSecret();
+      try {
+        await mfaRepository.savePendingSecret(user.id, encrypt(secret));
+      } catch (err) {
+        // Another setup request for this user created the row at the same moment.
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          throw ApiError.conflict('MFA setup is already in progress. Please try again.');
+        }
+        throw err;
       }
-      throw err;
-    }
 
-    await activityLogService.record(
-      {
-        action: ACTIVITY_ACTIONS.mfaSetup,
-        status: ActivityStatus.success,
-        actorId: user.id,
-        targetUserId: user.id,
-        sessionId: user.sessionId,
-      },
-      client,
-    );
+      await activityLogService.record(
+        {
+          action: ACTIVITY_ACTIONS.mfaSetup,
+          status: ActivityStatus.success,
+          actorId: user.id,
+          targetUserId: user.id,
+          sessionId: user.sessionId,
+        },
+        client,
+      );
+    }
 
     return { secret, qrCode: await QRCode.toDataURL(totpUri(secret, await userRepository.findUsername(user.id))) };
   },

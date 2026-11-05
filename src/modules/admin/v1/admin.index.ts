@@ -3,7 +3,11 @@ import { Portal } from '../../../config/portals.js';
 import { authenticate } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { authRoutesFor } from '../../auth/v1/auth.index.js';
+import { loginReportController } from '../../login-report/v1/login-report.controller.js';
+import { loginReportQuerySchema } from '../../login-report/v1/login-report.schema.js';
 import { profileRoutesFor } from '../../profile/v1/profile.index.js';
+import { securityAlertController } from '../../security-alert/v1/security-alert.controller.js';
+import { securityAlertParamsSchema, securityAlertQuerySchema } from '../../security-alert/v1/security-alert.schema.js';
 import { adminController } from './admin.controller.js';
 import { listAgentsQuerySchema, updateUserPermissionsSchema } from '../../super-admin/v1/super-admin.schema.js';
 import { agentUuidParamsSchema, changeAgentStatusSchema, createAgentSchema } from './admin.schema.js';
@@ -43,6 +47,15 @@ router.patch(
   adminController.changeAgentStatus,
 );
 router.delete('/agents/:uuid', validate({ params: agentUuidParamsSchema }), adminController.deleteAgent);
+router.get('/login-reports', validate({ query: loginReportQuerySchema }), loginReportController.list);
+router.get('/login-reports/summary', validate({ query: loginReportQuerySchema }), loginReportController.summary);
+router.get('/login-reports/export', validate({ query: loginReportQuerySchema }), loginReportController.exportCsv);
+router.get('/security-alerts', validate({ query: securityAlertQuerySchema }), securityAlertController.list);
+router.patch(
+  '/security-alerts/:id/resolve',
+  validate({ params: securityAlertParamsSchema }),
+  securityAlertController.resolve,
+);
 router.get('/agents/:uuid/mfa', validate({ params: agentUuidParamsSchema }), adminController.getAgentMfa);
 router.delete('/agents/:uuid/mfa', validate({ params: agentUuidParamsSchema }), adminController.resetAgentMfa);
 

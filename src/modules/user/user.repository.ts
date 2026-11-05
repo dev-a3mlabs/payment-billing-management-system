@@ -25,6 +25,7 @@ export const userRepository = {
     prisma.user.findMany({
       where: { role, status: { not: UserStatus.deleted } },
       select: {
+        id: true,
         uuid: true,
         username: true,
         role: true,
@@ -67,6 +68,7 @@ export const userRepository = {
       status: { not: UserStatus.deleted },
     },
     select: {
+      id: true,
       uuid: true,
       username: true,
       firstName: true,

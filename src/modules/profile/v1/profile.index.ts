@@ -2,6 +2,10 @@ import { Router } from 'express';
 import type { Portal } from '../../../config/portals.js';
 import { authenticate } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
+import { loginReportController } from '../../login-report/v1/login-report.controller.js';
+import { loginHistoryQuerySchema } from '../../login-report/v1/login-report.schema.js';
+import { securityAlertController } from '../../security-alert/v1/security-alert.controller.js';
+import { ownSecurityAlertQuerySchema } from '../../security-alert/v1/security-alert.schema.js';
 import { profileController } from './profile.controller.js';
 import { disableMfaSchema, enableMfaSchema, sessionUuidParamsSchema, updateProfileSchema } from './profile.schema.js';
 
@@ -16,6 +20,18 @@ export const profileRoutesFor = (portal: Portal) => {
     authenticate(portal),
     validate({ params: sessionUuidParamsSchema }),
     profileController.revokeSession,
+  );
+  router.get(
+    '/login-history',
+    authenticate(portal),
+    validate({ query: loginHistoryQuerySchema }),
+    loginReportController.ownHistory,
+  );
+  router.get(
+    '/security-alerts',
+    authenticate(portal),
+    validate({ query: ownSecurityAlertQuerySchema }),
+    securityAlertController.ownList,
   );
   router.get('/mfa', authenticate(portal), profileController.getMfa);
   router.post('/mfa/setup', authenticate(portal), profileController.setupMfa);

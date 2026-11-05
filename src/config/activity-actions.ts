@@ -9,6 +9,8 @@ export const ACTIVITY_ACTIONS = {
   mfaReset: 'auth.mfa.reset',
   mfaSetup: 'auth.mfa.setup',
   tokenReuseDetected: 'auth.token.reuse_detected',
+  loginReportExport: 'report.login.export',
+  securityAlertResolve: 'security.alert.resolve',
   passwordChange: 'user.password.change',
   profileUpdate: 'user.profile.update',
   statusChange: 'user.status.change',

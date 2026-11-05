@@ -4,7 +4,11 @@ import { authenticate } from '../../../middlewares/auth.middleware.js';
 import { requireMfaSetup } from '../../../middlewares/require-mfa-setup.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { authRoutesFor } from '../../auth/v1/auth.index.js';
+import { loginReportController } from '../../login-report/v1/login-report.controller.js';
+import { loginReportQuerySchema } from '../../login-report/v1/login-report.schema.js';
 import { profileRoutesFor } from '../../profile/v1/profile.index.js';
+import { securityAlertController } from '../../security-alert/v1/security-alert.controller.js';
+import { securityAlertParamsSchema, securityAlertQuerySchema } from '../../security-alert/v1/security-alert.schema.js';
 import { superAdminController } from './super-admin.controller.js';
 import {
   changeUserStatusSchema,
@@ -64,6 +68,15 @@ router.patch(
 router.get('/users/:uuid/sessions', validate({ params: userUuidParamsSchema }), superAdminController.getUserSessions);
 router.delete('/users/:uuid/sessions', validate({ params: userUuidParamsSchema }), superAdminController.revokeUserSessions);
 router.post('/users/:uuid/unlock', validate({ params: userUuidParamsSchema }), superAdminController.unlockUser);
+router.get('/login-reports', validate({ query: loginReportQuerySchema }), loginReportController.list);
+router.get('/login-reports/summary', validate({ query: loginReportQuerySchema }), loginReportController.summary);
+router.get('/login-reports/export', validate({ query: loginReportQuerySchema }), loginReportController.exportCsv);
+router.get('/security-alerts', validate({ query: securityAlertQuerySchema }), securityAlertController.list);
+router.patch(
+  '/security-alerts/:id/resolve',
+  validate({ params: securityAlertParamsSchema }),
+  securityAlertController.resolve,
+);
 router.get('/users/:uuid/mfa', validate({ params: userUuidParamsSchema }), superAdminController.getUserMfa);
 router.delete('/users/:uuid/mfa', validate({ params: userUuidParamsSchema }), superAdminController.resetUserMfa);
 router.delete('/users/:uuid', validate({ params: userUuidParamsSchema }), superAdminController.deleteUser);

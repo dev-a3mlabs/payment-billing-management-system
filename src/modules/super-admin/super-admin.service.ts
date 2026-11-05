@@ -85,12 +85,12 @@ export const superAdminService = {
 
 
   listAdmins: async (requester: AuthUser) => {
-    return userRepository.findAllByRole(Role.admin);
+    return sessionService.withActiveDevices(await userRepository.findAllByRole(Role.admin));
   },
 
 
   listAgents: async (requester: AuthUser) => {
-    return userRepository.findAllByRole(Role.agent);
+    return sessionService.withActiveDevices(await userRepository.findAllByRole(Role.agent));
   },
 
   listAdminAgents: async (adminUuid: string, page: number) => {
@@ -105,7 +105,7 @@ export const superAdminService = {
     ]);
 
     return {
-      agents,
+      agents: await sessionService.withActiveDevices(agents),
       pagination: {
         page,
         pageSize: PAGE_SIZE,

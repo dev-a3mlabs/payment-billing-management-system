@@ -3,6 +3,7 @@ import { ACTIVITY_ACTIONS } from '../../config/activity-actions.js';
 import { env } from '../../config/env.js';
 import { ERROR_CODES } from '../../config/error-codes.js';
 import { LOGIN_BLOCK_REASONS } from '../../config/login-block-reasons.js';
+import type { MfaMethod } from '../../config/mfa-methods.js';
 import { ROLE_PORTAL, type Portal } from '../../config/portals.js';
 import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
 import { withTransaction } from '../../db/transaction.js';
@@ -14,13 +15,14 @@ import { generateRefreshToken, hashToken, signAccessToken } from '../../utils/to
 import { activityLogService } from '../activity-log/activity-log.service.js';
 import { mfaRepository } from '../mfa/mfa.repository.js';
 import { mfaService } from '../mfa/mfa.service.js';
+import { securityAlertService } from '../security-alert/security-alert.service.js';
 import { userService } from '../user/user.service.js';
 import { userSecurityService } from '../user-security/user-security.service.js';
 import { sessionRepository } from '../session/session.repository.js';
 import { sessionService } from '../session/session.service.js';
 import { authRepository } from './auth.repository.js';
 import { isDeviceAllowed } from './device-limit.js';
-import { toLoginEventData } from './login-event.js';
+import { toLoginEventData, toLoginPlace } from './login-event.js';
 import { checkLoginRisk, LOGIN_VERIFICATION_FAILED, type FingerprintLookup } from './login-risk.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import type { ChangePasswordInput, LoginInput, LoginMfaInput } from './v1/auth.schema.js';
@@ -36,6 +38,7 @@ const INVALID_REFRESH_TOKEN = 'Invalid or expired refresh token';
 const INVALID_MFA_TOKEN = 'Your login has expired. Please log in again.';
 const INVALID_MFA_CODE = 'Invalid code';
 const MFA_CHALLENGE_MAX_ATTEMPTS = 5;
+const MAX_ATTEMPTED_USERNAME_LENGTH = 100;
 const ACCOUNT_LOCKED = 'Your account is locked. Please contact your administrator.';
 const TEMP_PASSWORD_USED = 'Your temporary password has already been used. Please contact your admin to reset it.';
 export const LOGIN_TEMPORARILY_UNAVAILABLE =
@@ -111,15 +114,32 @@ const recordBlockedLogin = (
     }),
   );
 
-// Checked before any login writes, so a blocked login doesn't burn the temp password.
-const checkDevice = async (user: LoginUser, eventId: string, portal: Portal, client: ClientInfo) => {
-  const lookup = await fingerprintService.getEvent(eventId).then(
+const lookupEvent = (eventId: string): Promise<FingerprintLookup> =>
+  fingerprintService.getEvent(eventId).then(
     (event) => ({ event, failed: false }),
     (err) => {
       logger.warn('Fingerprint lookup failed:', err);
       return { event: null, failed: true };
     },
   );
+
+// Saves a failed attempt with its device and location, and raises an alert when failures pile up.
+const recordFailedLogin = async (user: LoginUser, portal: Portal, lookup: FingerprintLookup, client: ClientInfo, blockReason: string) => {
+  const event = await guardEventReuse(() =>
+    authRepository.createLoginEvent({
+      userId: user.id,
+      portal,
+      status: LoginStatus.failed,
+      blockReason,
+      ...toLoginEventData(lookup.event, client),
+    }),
+  );
+  await securityAlertService.checkFailedLoginSpike(user.id, event.id);
+};
+
+// Checked before any login writes, so a blocked login doesn't burn the temp password.
+const checkDevice = async (user: LoginUser, eventId: string, portal: Portal, client: ClientInfo) => {
+  const lookup = await lookupEvent(eventId);
 
   const block = checkLoginRisk(lookup);
   if (block) {
@@ -130,7 +150,13 @@ const checkDevice = async (user: LoginUser, eventId: string, portal: Portal, cli
   return lookup;
 };
 
-const startSession = async (user: LoginUser, portal: Portal, lookup: FingerprintLookup, client: ClientInfo) => {
+const startSession = async (
+  user: LoginUser,
+  portal: Portal,
+  lookup: FingerprintLookup,
+  client: ClientInfo,
+  mfaMethod?: MfaMethod,
+) => {
   const visitorId = lookup.event?.identification.visitor_id;
 
   // All login writes succeed or fail together, so a rejected login never burns the temp password.
@@ -161,16 +187,24 @@ const startSession = async (user: LoginUser, portal: Portal, lookup: Fingerprint
         tx,
       );
 
-      await authRepository.createLoginEvent(
+      const { travel, ...flags } = await securityAlertService.detectLoginSignals(
+        user.id,
+        toLoginPlace(lookup.event),
+        tx,
+      );
+      const event = await authRepository.createLoginEvent(
         {
           userId: user.id,
           sessionId: created.id,
           portal,
           status: LoginStatus.success,
+          mfaMethod,
+          ...flags,
           ...toLoginEventData(lookup.event, client),
         },
         tx,
       );
+      await securityAlertService.raiseLoginAlerts(user.id, event.id, { travel, ...flags }, tx);
 
       return created;
     }),
@@ -227,18 +261,22 @@ export const authService = {
     const passwordMatches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
     // A deleted account looks the same as one that never existed.
     if (!user || user.status === UserStatus.deleted) {
+      const lookup = await lookupEvent(eventId);
+      await guardEventReuse(() =>
+        authRepository.createLoginEvent({
+          attemptedUsername: username.slice(0, MAX_ATTEMPTED_USERNAME_LENGTH),
+          portal,
+          status: LoginStatus.failed,
+          blockReason: LOGIN_BLOCK_REASONS.unknownUser,
+          ...toLoginEventData(lookup.event, client),
+        }),
+      );
       throw ApiError.unauthorized(INVALID_CREDENTIALS, ERROR_CODES.INVALID_CREDENTIALS);
     }
 
     if (!passwordMatches) {
       const { locked, remainingAttempts } = await userSecurityService.recordFailedLogin(user, client);
-      await authRepository.createLoginEvent({
-        userId: user.id,
-        portal,
-        status: LoginStatus.failed,
-        blockReason: LOGIN_BLOCK_REASONS.wrongPassword,
-        ...toLoginEventData(null, client),
-      });
+      await recordFailedLogin(user, portal, await lookupEvent(eventId), client, LOGIN_BLOCK_REASONS.wrongPassword);
       if (locked) {
         throw ApiError.forbidden(ACCOUNT_LOCKED, ERROR_CODES.ACCOUNT_LOCKED);
       }
@@ -306,7 +344,8 @@ export const authService = {
       throw ApiError.forbidden(LOGIN_VERIFICATION_FAILED, ERROR_CODES.LOGIN_BLOCKED);
     }
 
-    if (!(await mfaService.verifyCode(user.id, code))) {
+    const mfaMethod = await mfaService.verifyCode(user.id, code);
+    if (!mfaMethod) {
       const { attempts } = await mfaRepository.addChallengeAttempt(challenge.id);
       if (attempts >= MFA_CHALLENGE_MAX_ATTEMPTS) {
         await mfaRepository.closeChallenge(challenge.id);
@@ -314,13 +353,7 @@ export const authService = {
 
       // Nobody can unlock the super admin, so their wrong codes don't lock the account; the limit above still applies.
       const { locked } = await userSecurityService.recordFailedLogin(user, client, user.role !== Role.super_admin);
-      await authRepository.createLoginEvent({
-        userId: user.id,
-        portal,
-        status: LoginStatus.failed,
-        blockReason: LOGIN_BLOCK_REASONS.wrongMfaCode,
-        ...toLoginEventData(null, client),
-      });
+      await recordFailedLogin(user, portal, lookup, client, LOGIN_BLOCK_REASONS.wrongMfaCode);
       if (locked) {
         throw ApiError.forbidden(ACCOUNT_LOCKED, ERROR_CODES.ACCOUNT_LOCKED);
       }
@@ -332,7 +365,7 @@ export const authService = {
       throw ApiError.unauthorized(INVALID_MFA_TOKEN, ERROR_CODES.INVALID_MFA_TOKEN);
     }
 
-    return startSession(user, portal, lookup, client);
+    return startSession(user, portal, lookup, client, mfaMethod);
   },
 
   refresh: async (refreshToken: string, portal: Portal, client: ClientInfo) => {

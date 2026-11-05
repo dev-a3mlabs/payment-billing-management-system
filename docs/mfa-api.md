@@ -35,7 +35,7 @@ Logged-in requests need `Authorization: Bearer <ACCESS_TOKEN>`.
 ```
 
 Rules for step 2:
-- `eventId` must be a **new** Fingerprint event from the **same browser** as step 1. Call Fingerprint again before sending; don't reuse step 1's `eventId`.
+- `eventId` must be a **new** Fingerprint event from the **same browser** as step 1. Call Fingerprint again before **every** code attempt, including a retry after a wrong code; don't reuse an earlier `eventId`. The same applies to step 1: get a new `eventId` before every login attempt.
 - `code` is the 6-digit app code **or** a recovery code. Add a "Use a recovery code" link that switches the input to text.
 - `mfaToken` is valid for **5 minutes** and up to **5 wrong codes**. After that you get `INVALID_MFA_TOKEN`, so send the user back to the login screen.
 - No Turnstile token is needed in step 2.
@@ -62,7 +62,7 @@ Also handle it at any time: if any API returns **403 `MFA_SETUP_REQUIRED`**, go 
    and a "I saved them" button before continuing
 ```
 
-- If the user scanned wrong, just call step 1 again. It replaces the old QR until MFA is enabled.
+- Calling step 1 again within **10 minutes** returns the **same** QR and secret, so a refresh or a double call doesn't break a QR the user already scanned. After 10 minutes without enabling, step 1 creates a new QR. If the user scanned wrong, they can delete the entry in the app and scan the same QR again.
 - Enabling MFA **logs the user out of all their other devices**. The current device stays logged in.
 
 ### 2.4 Profile security screen
@@ -278,7 +278,7 @@ curl --location --request POST 'http://localhost:5000/api/v1/admin/profile/mfa/s
 { "success": false, "message": "MFA setup is already in progress. Please try again.", "error": { "code": "CONFLICT" } }
 ```
 
-Call setup **once**: on the button click, with the button disabled while the request runs. Every setup call creates a new secret, so only the QR from the **last successful** call works.
+Call setup **once**: on the button click, with the button disabled while the request runs. Repeated calls within 10 minutes return the same QR, so they're harmless, but they're still unnecessary requests.
 
 ### 4.3 Confirm and turn on
 

@@ -53,6 +53,9 @@ model User {
   mfaRecoveryCodes MfaRecoveryCode[]
   mfaChallenges    MfaChallenge[]
 
+  securityAlerts         SecurityAlert[] @relation("SecurityAlertUser")
+  securityAlertsResolved SecurityAlert[] @relation("SecurityAlertResolvedBy")
+
   activitiesAsActor  ActivityLog[] @relation("ActivityActor")
   activitiesAsTarget ActivityLog[] @relation("ActivityTarget")
 
@@ -255,15 +258,22 @@ model MfaChallenge {
   @@map("mfa_challenges")
 }
 
+// userId is null when the username didn't match any account; attemptedUsername keeps what was typed.
 model LoginEvent {
-  id          BigInt       @id @default(autoincrement())
-  userId      Int          @map("user_id")
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sessionId   Int?         @map("session_id")
-  session     UserSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
-  portal      String       @db.VarChar(30)
-  status      LoginStatus
-  blockReason String?      @map("block_reason") @db.VarChar(50)
+  id                BigInt       @id @default(autoincrement())
+  userId            Int?         @map("user_id")
+  user              User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attemptedUsername String?      @map("attempted_username") @db.VarChar(100)
+  sessionId         Int?         @map("session_id")
+  session           UserSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  portal            String       @db.VarChar(30)
+  status            LoginStatus
+  blockReason       String?      @map("block_reason") @db.VarChar(50)
+  mfaMethod         String?      @map("mfa_method") @db.VarChar(20)
+
+  isNewDevice        Boolean @default(false) @map("is_new_device")
+  isNewLocation      Boolean @default(false) @map("is_new_location")
+  isImpossibleTravel Boolean @default(false) @map("is_impossible_travel")
 
   requestIp String? @map("request_ip") @db.VarChar(45)
   userAgent String? @map("user_agent") @db.VarChar(512)
@@ -282,10 +292,38 @@ model LoginEvent {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  securityAlerts SecurityAlert[]
+
   @@index([userId, createdAt])
+  @@index([userId, visitorId])
+  @@index([userId, countryCode, city])
   @@index([visitorId])
+  @@index([status, createdAt])
+  @@index([requestIp])
+  @@index([countryCode])
   @@index([createdAt])
   @@map("login_events")
+}
+
+model SecurityAlert {
+  id           Int         @id @default(autoincrement())
+  userId       Int         @map("user_id")
+  user         User        @relation("SecurityAlertUser", fields: [userId], references: [id], onDelete: Cascade)
+  type         String      @db.VarChar(30)
+  loginEventId BigInt?     @map("login_event_id")
+  loginEvent   LoginEvent? @relation(fields: [loginEventId], references: [id], onDelete: SetNull)
+  metadata     Json?
+  resolvedAt   DateTime?   @map("resolved_at")
+  resolvedById Int?        @map("resolved_by_id")
+  resolvedBy   User?       @relation("SecurityAlertResolvedBy", fields: [resolvedById], references: [id])
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([loginEventId])
+  @@index([resolvedById])
+  @@index([resolvedAt])
+  @@index([createdAt])
+  @@map("security_alerts")
 }
 
 enum ActivityStatus {

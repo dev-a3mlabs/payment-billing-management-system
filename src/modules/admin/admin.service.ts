@@ -119,7 +119,7 @@ export const adminService = {
     ]);
 
     return {
-      items: agents, // the repository `select` already returns only safe fields
+      items: await sessionService.withActiveDevices(agents),
       pagination: {
         page,
         pageSize: AGENTS_PAGE_SIZE,

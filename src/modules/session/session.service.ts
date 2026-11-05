@@ -26,4 +26,12 @@ export const sessionService = {
   },
 
   revokeAll: (userId: number) => authRepository.revokeAllSessions(userId, SESSION_REVOKE_REASONS.revokedByAdmin),
+
+  // Adds activeDevices to each user and drops the internal id, using one query for the whole list.
+  withActiveDevices: async <T extends { id: number }>(users: T[]) => {
+    const counts = await sessionRepository.countActiveByUser({ userId: { in: users.map((user) => user.id) } });
+    const byUser = new Map(counts.map((row) => [row.userId, row._count._all]));
+
+    return users.map(({ id, ...user }) => ({ ...user, activeDevices: byUser.get(id) ?? 0 }));
+  },
 };
