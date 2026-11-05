@@ -4,6 +4,7 @@ import { Role, UserStatus } from '../../generated/prisma/enums.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { accessService } from '../access/access.service.js';
+import { mfaService } from '../mfa/mfa.service.js';
 import { userRepository } from '../user/user.repository.js';
 import { userService } from '../user/user.service.js';
 import { sessionService } from '../session/session.service.js';
@@ -160,6 +161,11 @@ export const superAdminService = {
 
   unlockUser: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
     userSecurityService.unlock((await findManagedUser(uuid)).id, superAdmin.id, client),
+
+  getUserMfa: async (uuid: string) => mfaService.getStatus(await findManagedUser(uuid)),
+
+  resetUserMfa: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
+    mfaService.reset((await findManagedUser(uuid)).id, superAdmin.id, client),
 
   deleteUser: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
     userService.changeStatus(await findManagedUser(uuid), UserStatus.deleted, superAdmin.id, client),

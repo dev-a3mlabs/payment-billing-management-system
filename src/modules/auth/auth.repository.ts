@@ -10,6 +10,12 @@ export const authRepository = {
       include: { parent: { select: { status: true } }, security: true },
     }),
 
+  findUserById: (id: number) =>
+    prisma.user.findUnique({
+      where: { id },
+      include: { parent: { select: { status: true } }, security: true },
+    }),
+
   findPasswordHash: async (userId: number) =>
     (await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } }))?.passwordHash,
 
@@ -70,6 +76,12 @@ export const authRepository = {
   revokeAllSessions: (userId: number, reason: SessionRevokeReason, tx: TxClient = prisma) =>
     tx.userSession.updateMany({
       where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(), revokeReason: reason },
+    }),
+
+  revokeOtherSessions: (userId: number, currentSessionId: number, reason: SessionRevokeReason, tx: TxClient) =>
+    tx.userSession.updateMany({
+      where: { userId, id: { not: currentSessionId }, revokedAt: null },
       data: { revokedAt: new Date(), revokeReason: reason },
     }),
 

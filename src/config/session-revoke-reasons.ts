@@ -8,6 +8,8 @@ export const SESSION_REVOKE_REASONS = {
   sameDeviceLogin: 'same_device_login',
   revokedByUser: 'revoked_by_user',
   revokedByAdmin: 'revoked_by_admin',
+  mfaEnabled: 'mfa_enabled',
+  mfaReset: 'mfa_reset',
 } as const;
 
 export type SessionRevokeReason = (typeof SESSION_REVOKE_REASONS)[keyof typeof SESSION_REVOKE_REASONS];

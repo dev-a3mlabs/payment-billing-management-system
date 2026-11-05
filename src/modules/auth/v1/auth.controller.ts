@@ -9,6 +9,15 @@ import { authService } from '../auth.service.js';
 export const loginFor = (portal: Portal) => async (req: Request, res: Response) => {
   const data = await authService.login(req.body, portal, getClientInfo(req));
 
+  if (data.mfaRequired) {
+    return sendSuccess(res, { message: 'MFA code required', data });
+  }
+  sendSuccess(res, { message: data.mustChangePassword ? 'Password change required' : 'Login successful', data });
+};
+
+export const loginMfaFor = (portal: Portal) => async (req: Request, res: Response) => {
+  const data = await authService.loginMfa(req.body, portal, getClientInfo(req));
+
   sendSuccess(res, { message: data.mustChangePassword ? 'Password change required' : 'Login successful', data });
 };
 

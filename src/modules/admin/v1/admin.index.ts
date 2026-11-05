@@ -8,6 +8,7 @@ import { adminController } from './admin.controller.js';
 import { listAgentsQuerySchema, updateUserPermissionsSchema } from '../../super-admin/v1/super-admin.schema.js';
 import { agentUuidParamsSchema, changeAgentStatusSchema, createAgentSchema } from './admin.schema.js';
 import { requirePasswordChanged } from '../../../middlewares/require-password-changed.middleware.js';
+import { requireMfaSetup } from '../../../middlewares/require-mfa-setup.middleware.js';
 
 const router = Router();
 
@@ -20,7 +21,11 @@ router.use(authenticate(Portal.admin));
 // Block normal access until the password is changed
 router.use(requirePasswordChanged);
 
+// Block normal access until MFA is set up, when it is required
+router.use(requireMfaSetup);
+
 router.get('/permissions', adminController.getPermissions);
+router.get('/permissions/me', adminController.getOwnPermissions);
 router.get('/agents', validate({ query: listAgentsQuerySchema }), adminController.getAgents);
 router.post('/agents', validate({ body: createAgentSchema }), adminController.createAgent);
 router.get('/agents/quota', adminController.getAgentQuota);
@@ -38,5 +43,7 @@ router.patch(
   adminController.changeAgentStatus,
 );
 router.delete('/agents/:uuid', validate({ params: agentUuidParamsSchema }), adminController.deleteAgent);
+router.get('/agents/:uuid/mfa', validate({ params: agentUuidParamsSchema }), adminController.getAgentMfa);
+router.delete('/agents/:uuid/mfa', validate({ params: agentUuidParamsSchema }), adminController.resetAgentMfa);
 
 export default router;

@@ -11,16 +11,27 @@ import { userSecurityRepository } from './user-security.repository.js';
 // Wrong passwords older than this no longer count towards the lock.
 const ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
 
+// Used when the lockout policy is off but the attempt must still count, like a wrong MFA code.
+const FORCED_MAX_ATTEMPTS = 5;
+
 export const userSecurityService = {
-  // remainingAttempts is null when lockout is off for this user.
-  recordFailedLogin: async (user: { id: number; role: Role; security: UserSecurity | null }, client: ClientInfo) => {
+  // remainingAttempts is null when lockout is off for this user and alwaysCount is false.
+  recordFailedLogin: async (
+    user: { id: number; role: Role; security: UserSecurity | null },
+    client: ClientInfo,
+    alwaysCount = false,
+  ) => {
     const { security } = user;
     if (security?.lockedAt) return { locked: true, remainingAttempts: 0 };
-    if (!(await accessService.hasPermission(user, ACCESS_KEYS.lockoutEnabled))) {
+
+    const lockoutEnabled = await accessService.hasPermission(user, ACCESS_KEYS.lockoutEnabled);
+    if (!lockoutEnabled && !alwaysCount) {
       return { locked: false, remainingAttempts: null };
     }
 
-    const maxAttempts = await accessService.getNumber(user, ACCESS_KEYS.lockoutMaxAttempts);
+    const maxAttempts = lockoutEnabled
+      ? await accessService.getNumber(user, ACCESS_KEYS.lockoutMaxAttempts)
+      : FORCED_MAX_ATTEMPTS;
     const attempts =
       security?.lastFailedLoginAt && Date.now() - security.lastFailedLoginAt.getTime() < ATTEMPT_WINDOW_MS
         ? security.failedLoginAttempts + 1

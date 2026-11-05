@@ -12,6 +12,7 @@ const envSchema = z.object({
   FINGERPRINT_SECRET_API_KEY: z.string().min(1, 'FINGERPRINT_SECRET_API_KEY is required'),
   FINGERPRINT_REGION: z.enum(['global', 'eu', 'ap']).default('global'),
   CLOUDFLARE_SECRET_API_KEY: z.string().min(1, 'CLOUDFLARE_SECRET_API_KEY is required'),
+  MFA_ENCRYPTION_KEY: z.string().regex(/^[0-9a-f]{64}$/i, 'MFA_ENCRYPTION_KEY must be 64 hex characters'),
 });
 
 const parsed = envSchema.safeParse(process.env);

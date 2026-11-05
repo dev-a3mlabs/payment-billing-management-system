@@ -18,6 +18,13 @@ export const adminController = {
     sendSuccess(res, { message: 'Permissions retrieved successfully', data });
   },
 
+  getOwnPermissions: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const data = await adminService.getOwnPermissions(user);
+
+    sendSuccess(res, { message: 'Your permissions retrieved successfully', data });
+  },
+
   getAgentQuota: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
     const data = await adminService.getAgentQuota(user);
@@ -74,5 +81,19 @@ export const adminController = {
     await adminService.deleteAgent(req.params.uuid as string, user, getClientInfo(req));
 
     sendSuccess(res, { message: 'Agent deleted successfully' });
-  }
+  },
+
+  getAgentMfa: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    const data = await adminService.getAgentMfa(req.params.uuid as string, user);
+
+    sendSuccess(res, { message: 'Agent MFA status retrieved successfully', data });
+  },
+
+  resetAgentMfa: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    await adminService.resetAgentMfa(req.params.uuid as string, user, getClientInfo(req));
+
+    sendSuccess(res, { message: 'Agent MFA reset successfully' });
+  },
 };

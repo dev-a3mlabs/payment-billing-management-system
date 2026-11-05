@@ -3,7 +3,7 @@ import type { Portal } from '../../../config/portals.js';
 import { authenticate } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { profileController } from './profile.controller.js';
-import { sessionUuidParamsSchema, updateProfileSchema } from './profile.schema.js';
+import { disableMfaSchema, enableMfaSchema, sessionUuidParamsSchema, updateProfileSchema } from './profile.schema.js';
 
 // Profile router for one portal; each role module mounts it at /profile.
 export const profileRoutesFor = (portal: Portal) => {
@@ -17,6 +17,10 @@ export const profileRoutesFor = (portal: Portal) => {
     validate({ params: sessionUuidParamsSchema }),
     profileController.revokeSession,
   );
+  router.get('/mfa', authenticate(portal), profileController.getMfa);
+  router.post('/mfa/setup', authenticate(portal), profileController.setupMfa);
+  router.post('/mfa/enable', authenticate(portal), validate({ body: enableMfaSchema }), profileController.enableMfa);
+  router.post('/mfa/disable', authenticate(portal), validate({ body: disableMfaSchema }), profileController.disableMfa);
 
   return router;
 };

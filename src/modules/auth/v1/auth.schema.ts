@@ -7,6 +7,13 @@ export const loginSchema = z.object({
   IdentityToken: z.string().trim().min(1, 'Identity token is required').optional(),
 });
 
+// code is the 6-digit app code or a recovery code; eventId is a new Fingerprint event from the same browser.
+export const loginMfaSchema = z.object({
+  mfaToken: z.string().trim().min(1, 'MFA token is required'),
+  code: z.string().trim().min(1, 'Code is required').max(32, 'Code must be at most 32 characters'),
+  eventId: z.string().trim().min(1, 'Event ID is required'),
+});
+
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().trim().min(1, 'Refresh token is required'),
 });
@@ -37,4 +44,5 @@ export const changePasswordSchema = z
   });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+export type LoginMfaInput = z.infer<typeof loginMfaSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

@@ -242,6 +242,35 @@ curl --location --request DELETE 'http://localhost:5000/api/v1/super-admin/users
 
 ## 4. Admin APIs
 
+### 4.0 Get the admin's own permissions (new)
+
+`GET /admin/permissions/me`
+
+Returns the logged-in admin's own values, set by the super admin. Use them to show or hide actions such as "Create agent" (`user.agent.create`), "Delete agent" (`user.agent.delete`), "Activate / Deactivate" (`user.agent.status_change`) and "Reset MFA" (`user.agent.mfa_reset`). Labels come from `GET /admin/permissions`, matched by `key`.
+
+```bash
+curl --location 'http://localhost:5000/api/v1/admin/permissions/me' \
+--header 'Authorization: Bearer <ADMIN_TOKEN>'
+```
+
+**200 OK**
+```json
+{
+  "success": true,
+  "message": "Your permissions retrieved successfully",
+  "data": [
+    { "key": "auth.device_limit.enabled", "value": false, "source": "user", "locked": false },
+    { "key": "user.agent.create", "value": false, "source": "user", "locked": false },
+    { "key": "user.agent.delete", "value": true, "source": "user", "locked": false },
+    { "key": "user.agent.max", "value": 1, "source": "user", "locked": false },
+    { "key": "user.agent.mfa_reset", "value": false, "source": "default", "locked": false },
+    { "key": "user.agent.status_change", "value": true, "source": "user", "locked": false }
+  ]
+}
+```
+
+(Shortened: the real response has every key that applies to admins.)
+
 ### 4.1 Get an agent's permissions (changed)
 
 `GET /admin/agents/:uuid/permissions`

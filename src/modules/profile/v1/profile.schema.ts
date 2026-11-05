@@ -38,4 +38,15 @@ export const sessionUuidParamsSchema = z.object({
   uuid: z.uuid('Session UUID must be a valid UUID'),
 });
 
+export const enableMfaSchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/, 'Code must be 6 digits'),
+});
+
+// code is the 6-digit app code or a recovery code.
+export const disableMfaSchema = z.object({
+  password: z.string().min(1, 'Password is required'),
+  code: z.string().trim().min(1, 'Code is required').max(32, 'Code must be at most 32 characters'),
+});
+
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type DisableMfaInput = z.infer<typeof disableMfaSchema>;

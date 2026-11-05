@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Portal } from '../../../config/portals.js';
 import { authenticate } from '../../../middlewares/auth.middleware.js';
+import { requireMfaSetup } from '../../../middlewares/require-mfa-setup.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { authRoutesFor } from '../../auth/v1/auth.index.js';
 import { profileRoutesFor } from '../../profile/v1/profile.index.js';
@@ -23,6 +24,9 @@ router.use('/profile', profileRoutesFor(Portal.super_admin));
 
 // Every route below needs a super admin token.
 router.use(authenticate(Portal.super_admin));
+
+// Block normal access until MFA is set up
+router.use(requireMfaSetup);
 
 router.get('/users/check-username', validate({ query: checkUsernameSchema }), superAdminController.checkUsername);
 router.post('/users', validate({ body: createUserSchema }), superAdminController.createUser);
@@ -60,6 +64,8 @@ router.patch(
 router.get('/users/:uuid/sessions', validate({ params: userUuidParamsSchema }), superAdminController.getUserSessions);
 router.delete('/users/:uuid/sessions', validate({ params: userUuidParamsSchema }), superAdminController.revokeUserSessions);
 router.post('/users/:uuid/unlock', validate({ params: userUuidParamsSchema }), superAdminController.unlockUser);
+router.get('/users/:uuid/mfa', validate({ params: userUuidParamsSchema }), superAdminController.getUserMfa);
+router.delete('/users/:uuid/mfa', validate({ params: userUuidParamsSchema }), superAdminController.resetUserMfa);
 router.delete('/users/:uuid', validate({ params: userUuidParamsSchema }), superAdminController.deleteUser);
 
 export default router;

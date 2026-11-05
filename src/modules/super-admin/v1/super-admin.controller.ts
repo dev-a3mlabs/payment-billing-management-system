@@ -118,6 +118,19 @@ export const superAdminController = {
     sendSuccess(res, { message: 'User unlocked successfully' });
   },
 
+  getUserMfa: async (req: Request, res: Response) => {
+    const data = await superAdminService.getUserMfa(req.params.uuid as string);
+
+    sendSuccess(res, { message: 'User MFA status retrieved successfully', data });
+  },
+
+  resetUserMfa: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    await superAdminService.resetUserMfa(req.params.uuid as string, user, getClientInfo(req));
+
+    sendSuccess(res, { message: 'User MFA reset successfully' });
+  },
+
   deleteUser: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
     await superAdminService.deleteUser(req.params.uuid as string, user, getClientInfo(req));

@@ -5,9 +5,11 @@ export const ACCESS_KEYS = {
   deviceLimitMax: 'auth.device_limit.max_devices',
   lockoutEnabled: 'auth.lockout.enabled',
   lockoutMaxAttempts: 'auth.lockout.max_attempts',
+  mfaRequired: 'auth.mfa.required',
   agentCreate: 'user.agent.create',
   agentDelete: 'user.agent.delete',
   agentMax: 'user.agent.max',
+  agentMfaReset: 'user.agent.mfa_reset',
   agentStatusChange: 'user.agent.status_change',
 } as const;
 
@@ -76,6 +78,17 @@ export const ACCESS_KEY_DEFINITIONS: AccessKeyDefinition[] = [
     max: 20,
   },
   {
+    key: ACCESS_KEYS.mfaRequired,
+    label: 'Require MFA',
+    description: 'Require an authenticator app code at every login',
+    module: 'auth',
+    kind: AccessKind.policy,
+    valueType: AccessValueType.bool,
+    defaultValue: 'false',
+    appliesTo: [Role.admin, Role.agent],
+    editableBy: [Role.super_admin, Role.admin],
+  },
+  {
     key: ACCESS_KEYS.agentCreate,
     label: 'Create agents',
     description: 'Admin can create agents',
@@ -109,6 +122,17 @@ export const ACCESS_KEY_DEFINITIONS: AccessKeyDefinition[] = [
     editableBy: [Role.super_admin],
     min: 1,
     max: 1000,
+  },
+  {
+    key: ACCESS_KEYS.agentMfaReset,
+    label: 'Reset agent MFA',
+    description: 'Admin can reset MFA for their agents',
+    module: 'user',
+    kind: AccessKind.permission,
+    valueType: AccessValueType.bool,
+    defaultValue: 'false',
+    appliesTo: [Role.admin],
+    editableBy: [Role.super_admin],
   },
   {
     key: ACCESS_KEYS.agentStatusChange,

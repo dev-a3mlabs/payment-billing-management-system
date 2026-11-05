@@ -9,6 +9,9 @@ export const userRepository = {
   findByUuid: (uuid: string) =>
     prisma.user.findUnique({ where: { uuid }, select: { id: true, role: true, status: true, parentId: true } }),
 
+  findUsername: async (id: number) =>
+    (await prisma.user.findUniqueOrThrow({ where: { id }, select: { username: true } })).username,
+
   create: (
     data: { username: string; passwordHash: string; role: Role; createdById: number; parentId?: number },
     tx: TxClient = prisma,

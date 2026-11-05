@@ -5,6 +5,7 @@ import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import { ApiError } from '../../utils/ApiError.js';
 import type { ClientInfo } from '../../utils/request.js';
 import { accessService } from '../access/access.service.js';
+import { mfaService } from '../mfa/mfa.service.js';
 import { sessionService } from '../session/session.service.js';
 import { userRepository } from '../user/user.repository.js';
 import { userService } from '../user/user.service.js';
@@ -38,6 +39,8 @@ export const adminService = {
       appliesTo: definition.appliesTo.filter((role) => role !== Role.super_admin),
       editableBy: definition.editableBy.filter((role) => role !== Role.super_admin),
     })),
+
+  getOwnPermissions: (admin: AuthUser) => accessService.getUserValues(admin),
 
   getAgentPermissions: async (agentUuid: string, admin: AuthUser) =>
     getAgentValues(await findOwnAgent(agentUuid, admin), admin),
@@ -139,5 +142,20 @@ export const adminService = {
     }
 
     await userService.changeStatus(agent, UserStatus.deleted, admin.id, client);
+  },
+
+  getAgentMfa: async (agentUuid: string, admin: AuthUser) => mfaService.getStatus(await findOwnAgent(agentUuid, admin)),
+
+  resetAgentMfa: async (agentUuid: string, admin: AuthUser, client: ClientInfo) => {
+    if (!(await accessService.hasPermission(admin, ACCESS_KEYS.agentMfaReset))) {
+      throw ApiError.forbidden('You do not have permission to reset agent MFA');
+    }
+
+    const agent = await findOwnAgent(agentUuid, admin);
+    if (agent.status === UserStatus.suspended) {
+      throw ApiError.forbidden('You cannot reset MFA for this agent');
+    }
+
+    await mfaService.reset(agent.id, admin.id, client);
   },
 };
