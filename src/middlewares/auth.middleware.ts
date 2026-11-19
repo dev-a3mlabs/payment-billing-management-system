@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import { ERROR_CODES } from '../config/error-codes.js';
 import { ROLE_PORTAL, type Portal } from '../config/portals.js';
 import type { Role } from '../generated/prisma/enums.js';
@@ -30,12 +31,15 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
   let payload: AccessTokenPayload;
   try {
     payload = verifyAccessToken(header.slice('Bearer '.length));
-  } catch {
-    throw ApiError.unauthorized('Invalid or expired access token', ERROR_CODES.INVALID_TOKEN);
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      throw ApiError.unauthorized('Access token expired', ERROR_CODES.TOKEN_EXPIRED);
+    }
+    throw ApiError.unauthorized('Invalid access token', ERROR_CODES.INVALID_TOKEN);
   }
 
   if (payload.type !== 'access') {
-    throw ApiError.unauthorized('Invalid or expired access token', ERROR_CODES.INVALID_TOKEN);
+    throw ApiError.unauthorized('Invalid access token', ERROR_CODES.INVALID_TOKEN);
   }
   if (payload.portal !== portal) {
     throw ApiError.forbidden();
@@ -49,7 +53,7 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
     session.user.uuid !== payload.sub ||
     !userService.isActive(session.user)
   ) {
-    throw ApiError.unauthorized('Invalid or expired access token', ERROR_CODES.INVALID_TOKEN);
+    throw ApiError.unauthorized('Invalid access token', ERROR_CODES.INVALID_TOKEN);
   }
 
   const { user } = session;
@@ -57,7 +61,9 @@ export const authenticate = (portal: Portal) => async (req: Request, _res: Respo
     throw ApiError.forbidden();
   }
 
-  (req as AuthRequest).user = { 
+  await sessionService.markActive(session);
+
+  (req as AuthRequest).user = {
     id: user.id, 
     uuid: user.uuid, 
     role: user.role, 

@@ -687,7 +687,8 @@ curl --location 'http://localhost:5000/api/v1/agent/profile/sessions' \
 |---|---|---|---|
 | 400 | `VALIDATION_ERROR` | A filter or param is invalid (see section 5) | Show `details[].message` |
 | 401 | `UNAUTHORIZED` | No token sent | Go to login |
-| 401 | `INVALID_TOKEN` | Token expired, or the session was logged out or revoked | Refresh the token, or go to login |
+| 401 | `TOKEN_EXPIRED` | Access token expired | Refresh the token once, then retry the request |
+| 401 | `INVALID_TOKEN` | Session was logged out or revoked, or the token is invalid | Go to login (don't refresh) |
 | 403 | `FORBIDDEN` | Wrong portal for this token | Go to login |
 | 403 | `PASSWORD_CHANGE_REQUIRED` | Admin must change their password first (admin routes) | Open the change-password screen |
 | 403 | `MFA_SETUP_REQUIRED` | MFA is required and not set up yet (super admin and admin routes) | Open the MFA setup screen (see `mfa-api.md`) |

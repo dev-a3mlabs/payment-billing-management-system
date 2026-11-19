@@ -9,6 +9,8 @@ import { activityLogService } from '../activity-log/activity-log.service.js';
 import { authRepository } from '../auth/auth.repository.js';
 import { SESSION_IDLE_MS, sessionRepository } from './session.repository.js';
 
+const ACTIVITY_SAVE_INTERVAL_MS = 60 * 1000;
+
 const NO_DEVICE_DETAILS = {
   browserName: null,
   browserVersion: null,
@@ -26,6 +28,13 @@ export const sessionService = {
     !session.revokedAt &&
     session.expiresAt > new Date() &&
     Date.now() - session.lastActiveAt.getTime() < SESSION_IDLE_MS,
+
+  // Saves at most once a minute, so most requests don't write to the DB.
+  markActive: async (session: { id: number; lastActiveAt: Date }) => {
+    if (Date.now() - session.lastActiveAt.getTime() >= ACTIVITY_SAVE_INTERVAL_MS) {
+      await authRepository.touchSession(session.id);
+    }
+  },
 
   list: async (userId: number, currentSessionId?: number) =>
     (await sessionRepository.findActive(userId)).map(({ id, loginEvents, ...session }) => ({

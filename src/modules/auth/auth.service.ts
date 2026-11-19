@@ -44,7 +44,7 @@ const TEMP_PASSWORD_USED = 'Your temporary password has already been used. Pleas
 export const LOGIN_TEMPORARILY_UNAVAILABLE =
   'We could not complete your login right now. Please try again later.';
 
-// Refresh tokens never outlive their session, so a session lasts at most REFRESH_TOKEN_EXPIRES_DAYS.
+// Refresh tokens never outlive their session, so a session lasts at most SESSION_MAX_HOURS.
 const issueTokens = async (user: User, session: UserSession) => {
   const refreshToken = generateRefreshToken();
 
@@ -183,7 +183,7 @@ const startSession = async (
           ipAddress: client.ipAddress,
           userAgent: client.userAgent,
           visitorId,
-          expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + env.SESSION_MAX_HOURS * 60 * 60 * 1000),
         },
         tx,
       );

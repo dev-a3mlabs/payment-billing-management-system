@@ -4,7 +4,7 @@ import type { TxClient } from '../../db/transaction.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 
 // A session unused for this long no longer counts as logged in.
-export const SESSION_IDLE_MS = 24 * 60 * 60 * 1000;
+export const SESSION_IDLE_MS = 15 * 60 * 1000;
 
 const activeWhere = () => ({
   revokedAt: null,
