@@ -23,7 +23,20 @@ export const sessionRepository = {
         ipAddress: true,
         createdAt: true,
         lastActiveAt: true,
-        loginEvents: { select: { browserName: true, os: true, city: true, countryCode: true }, take: 1 },
+        loginEvents: {
+          select: {
+            browserName: true,
+            browserVersion: true,
+            os: true,
+            osVersion: true,
+            deviceType: true,
+            deviceBrand: true,
+            deviceModel: true,
+            city: true,
+            countryCode: true,
+          },
+          take: 1,
+        },
       },
       orderBy: { lastActiveAt: 'desc' },
     }),
@@ -47,8 +60,8 @@ export const sessionRepository = {
   countActiveByUser: (where: Prisma.UserSessionWhereInput) =>
     prisma.userSession.groupBy({ by: ['userId'], where: { AND: [where, activeWhere()] }, _count: { _all: true } }),
 
-  revokeOne: (userId: number, uuid: string, reason: SessionRevokeReason) =>
-    prisma.userSession.updateMany({
+  revokeOne: (userId: number, uuid: string, reason: SessionRevokeReason, tx: TxClient) =>
+    tx.userSession.updateMany({
       where: { userId, uuid, revokedAt: null },
       data: { revokedAt: new Date(), revokeReason: reason },
     }),

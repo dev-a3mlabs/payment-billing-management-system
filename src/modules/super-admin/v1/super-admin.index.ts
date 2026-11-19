@@ -18,6 +18,7 @@ import {
   updateUserGrantsSchema,
   updateUserPermissionsSchema,
   userPermissionParamsSchema,
+  userSessionParamsSchema,
   userUuidParamsSchema,
 } from './super-admin.schema.js';
 
@@ -67,6 +68,11 @@ router.patch(
 );
 router.get('/users/:uuid/sessions', validate({ params: userUuidParamsSchema }), superAdminController.getUserSessions);
 router.delete('/users/:uuid/sessions', validate({ params: userUuidParamsSchema }), superAdminController.revokeUserSessions);
+router.delete(
+  '/users/:uuid/sessions/:sessionUuid',
+  validate({ params: userSessionParamsSchema }),
+  superAdminController.revokeUserSession,
+);
 router.post('/users/:uuid/unlock', validate({ params: userUuidParamsSchema }), superAdminController.unlockUser);
 router.get('/login-reports', validate({ query: loginReportQuerySchema }), loginReportController.list);
 router.get('/login-reports/summary', validate({ query: loginReportQuerySchema }), loginReportController.summary);

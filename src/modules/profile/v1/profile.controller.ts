@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { SESSION_REVOKE_REASONS } from '../../../config/session-revoke-reasons.js';
 import type { AuthRequest } from '../../../middlewares/auth.middleware.js';
 import { getClientInfo } from '../../../utils/request.js';
 import { sendSuccess } from '../../../utils/response.js';
@@ -23,7 +24,13 @@ export const profileController = {
 
   revokeSession: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
-    await sessionService.revokeOne(user.id, req.params.uuid as string);
+    await sessionService.revokeOne(
+      user.id,
+      req.params.uuid as string,
+      SESSION_REVOKE_REASONS.revokedByUser,
+      user,
+      getClientInfo(req),
+    );
 
     sendSuccess(res, { message: 'Device logged out successfully' });
   },

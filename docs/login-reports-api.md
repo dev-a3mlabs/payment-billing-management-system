@@ -27,8 +27,9 @@ All requests need `Authorization: Bearer <ACCESS_TOKEN>`.
 | 13 | `GET /super-admin/admins` | Super admin | Admins list, now with `activeDevices` | 9.1 |
 | 14 | `GET /super-admin/:uuid/agents` | Super admin | One admin's agents, now with `activeDevices` | 9.2 |
 | 15 | `GET /admin/agents` | Admin | Their agents, now with `activeDevices` | 9.3 |
+| 16 | `GET /{portal}/profile/sessions`, `GET /super-admin/users/:uuid/sessions`, `GET /admin/agents/:uuid/sessions` | Everyone / Super admin / Admin | Logged-in devices, now with device fields | 9.4 |
 
-Related existing APIs used in the flows: `GET /super-admin/users/:uuid/sessions`, `DELETE /super-admin/users/:uuid/sessions`, `GET /admin/agents/:uuid/sessions`, `DELETE /admin/agents/:uuid/sessions`, `GET /{portal}/profile/sessions`.
+Related existing APIs used in the flows: `GET /super-admin/users/:uuid/sessions`, `DELETE /super-admin/users/:uuid/sessions`, `DELETE /super-admin/users/:uuid/sessions/:sessionUuid`, `GET /admin/agents/:uuid/sessions`, `DELETE /admin/agents/:uuid/sessions`, `DELETE /admin/agents/:uuid/sessions/:sessionUuid`, `GET /{portal}/profile/sessions`.
 
 ---
 
@@ -63,7 +64,11 @@ Every login attempt (success, failed and blocked) is saved and **kept forever**.
 | `mfaMethod` | `totp`, `recovery_code`, or `null` (no MFA used) |
 | `requestIp` | IP address |
 | `visitorId` | Fingerprint device ID |
-| `browserName`, `os`, `userAgent` | Device |
+| `browserName`, `browserVersion` | Browser, for example `Brave`, `Chrome Mobile`, `Edge`, `Opera` |
+| `os`, `osVersion` | Operating system, for example `Windows` `10`, `Android` `14` |
+| `deviceType` | `desktop`, `smartphone`, `tablet`, `phablet`, `tv`, `console`, `wearable` and others |
+| `deviceBrand`, `deviceModel` | For example `Samsung` `Galaxy S23`. Always `null` on desktops |
+| `userAgent` | Raw browser user agent |
 | `city`, `countryCode`, `latitude`, `longitude` | Location. Use `latitude` and `longitude` directly on a map |
 | `isNewDevice` | First successful login from this device for this user |
 | `isNewLocation` | First successful login from this city for this user |
@@ -71,6 +76,8 @@ Every login attempt (success, failed and blocked) is saved and **kept forever**.
 | `sessionActive` | This login's device is still logged in right now |
 | `user` | `{ uuid, username, role }`, or `null` for an unknown username |
 | `attemptedUsername` | The username typed, only when it matched no account |
+
+Any device field can be `null` when it isn't known. Logins saved before 2026-11-17 only have `browserName` and `os`.
 
 `blockReason` values:
 
@@ -119,6 +126,8 @@ GET /{portal}/login-reports/summary?userUuid=...     → summary cards for that 
 GET /{portal}/login-reports?userUuid=...             → history table and map
 GET /{portal}/security-alerts?userUuid=...           → that user's alerts (unresolvedCount = their open alerts)
 GET /super-admin/users/:uuid/sessions  or  GET /admin/agents/:uuid/sessions   → devices logged in now
+DELETE /super-admin/users/:uuid/sessions/:sessionUuid  or  DELETE /admin/agents/:uuid/sessions/:sessionUuid   → log out one device (session `uuid` from the list)
+(Admin: both DELETE /admin/agents/:uuid/sessions routes need the `user.agent.session_revoke` permission, otherwise 403 `FORBIDDEN`. Every device logout is saved in the activity log.)
 ```
 
 ### 4.4 Any user: Profile → Security
@@ -202,8 +211,13 @@ curl --location 'http://localhost:5000/api/v1/super-admin/login-reports?from=202
         "attemptedUsername": null,
         "requestIp": "103.21.45.10",
         "visitorId": "Xb7kP2mQ9sLr4TuV",
-        "browserName": "Chrome",
+        "browserName": "Brave",
+        "browserVersion": "131.0.0.0",
         "os": "Windows",
+        "osVersion": "10",
+        "deviceType": "desktop",
+        "deviceBrand": null,
+        "deviceModel": null,
         "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...",
         "city": "London",
         "countryCode": "GB",
@@ -225,9 +239,14 @@ curl --location 'http://localhost:5000/api/v1/super-admin/login-reports?from=202
         "attemptedUsername": "ghost_user",
         "requestIp": "185.220.101.4",
         "visitorId": "Qm3nR8tW1yZa6BcD",
-        "browserName": "Firefox",
-        "os": "Linux",
-        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) ...",
+        "browserName": "Chrome Mobile",
+        "browserVersion": "131.0.0.0",
+        "os": "Android",
+        "osVersion": "14",
+        "deviceType": "smartphone",
+        "deviceBrand": "Samsung",
+        "deviceModel": "Galaxy S23",
+        "userAgent": "Mozilla/5.0 (Linux; Android 14; SM-S911B) ...",
         "city": "Frankfurt",
         "countryCode": "DE",
         "isNewDevice": false,
@@ -301,8 +320,8 @@ curl --location 'http://localhost:5000/api/v1/super-admin/login-reports/export?f
 - `Content-Disposition: attachment; filename="login-report-2026-11-05.csv"`
 
 ```
-"Time","Username","Role","Portal","Status","Reason","MFA method","IP","Visitor ID","Browser","OS","City","Country","Latitude","Longitude","New device","New location","Impossible travel","Still logged in","User agent"
-"2026-11-05T09:53:23.400Z","test_agent_fz8rri","agent","agent","success","","totp","103.21.45.10","Xb7kP2mQ9sLr4TuV","Chrome","Windows","London","GB","51.5","-0.12","true","true","true","true","Mozilla/5.0 ..."
+"Time","Username","Role","Portal","Status","Reason","MFA method","IP","Visitor ID","Browser","Browser version","OS","OS version","Device type","Device brand","Device model","City","Country","Latitude","Longitude","New device","New location","Impossible travel","Still logged in","User agent"
+"2026-11-05T09:53:23.400Z","test_agent_fz8rri","agent","agent","success","","totp","103.21.45.10","Xb7kP2mQ9sLr4TuV","Brave","131.0.0.0","Windows","10","desktop","","","London","GB","51.5","-0.12","true","true","true","true","Mozilla/5.0 ..."
 ```
 
 In the browser, download it with `fetch` plus the `Authorization` header, then save the blob. A plain `<a href>` can't send the token. Every export is written to the activity log.
@@ -451,8 +470,13 @@ curl --location 'http://localhost:5000/api/v1/agent/profile/login-history?page=1
         "mfaMethod": "totp",
         "requestIp": "103.21.45.10",
         "visitorId": "Xb7kP2mQ9sLr4TuV",
-        "browserName": "Chrome",
+        "browserName": "Brave",
+        "browserVersion": "131.0.0.0",
         "os": "Windows",
+        "osVersion": "10",
+        "deviceType": "desktop",
+        "deviceBrand": null,
+        "deviceModel": null,
         "userAgent": "Mozilla/5.0 ...",
         "city": "London",
         "countryCode": "GB",
@@ -619,6 +643,42 @@ curl --location 'http://localhost:5000/api/v1/admin/agents?page=1' \
 }
 ```
 
+### 9.4 Sessions lists (changed)
+
+`GET /{portal}/profile/sessions`, `GET /super-admin/users/:uuid/sessions` and `GET /admin/agents/:uuid/sessions` now include the same device fields as the login history. `isCurrent` is only `true` in `/profile/sessions`, on the device making the request.
+
+```bash
+curl --location 'http://localhost:5000/api/v1/agent/profile/sessions' \
+--header 'Authorization: Bearer <AGENT_TOKEN>'
+```
+
+**200 OK**
+```json
+{
+  "success": true,
+  "message": "Sessions retrieved successfully",
+  "data": [
+    {
+      "uuid": "9a1d2c3e-4f50-4a6b-8c7d-0e1f2a3b4c5d",
+      "portal": "agent",
+      "ipAddress": "103.21.45.10",
+      "createdAt": "2026-11-17T09:10:00.000Z",
+      "lastActiveAt": "2026-11-17T09:10:00.000Z",
+      "browserName": "Chrome Mobile",
+      "browserVersion": "131.0.0.0",
+      "os": "Android",
+      "osVersion": "14",
+      "deviceType": "smartphone",
+      "deviceBrand": "Samsung",
+      "deviceModel": "Galaxy S23",
+      "city": "London",
+      "countryCode": "GB",
+      "isCurrent": true
+    }
+  ]
+}
+```
+
 ---
 
 ## 10. Errors every endpoint can return
@@ -654,3 +714,4 @@ Error format:
 - Export with `fetch` plus the token, then save the blob.
 - Show `unresolvedCount` as a badge on "Security alerts".
 - Show `activeDevices` in the admins and agents lists.
+- Show the device as `browserName` + `os` (for example "Brave on Windows"), plus `deviceBrand` `deviceModel` when not `null`. Pick the icon from `deviceType`.

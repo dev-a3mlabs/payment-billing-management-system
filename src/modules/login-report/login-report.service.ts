@@ -11,7 +11,7 @@ import { loginReportRepository } from './login-report.repository.js';
 import { scopeWhere, type ReportScope } from './report-scope.js';
 import type { LoginReportQuery } from './v1/login-report.schema.js';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 const DEFAULT_RANGE_DAYS = 30;
 const EXPORT_BATCH_SIZE = 1000;
 const TOP_COUNTRIES = 10;
@@ -66,7 +66,12 @@ const CSV_COLUMNS = [
   'IP',
   'Visitor ID',
   'Browser',
+  'Browser version',
   'OS',
+  'OS version',
+  'Device type',
+  'Device brand',
+  'Device model',
   'City',
   'Country',
   'Latitude',
@@ -98,7 +103,12 @@ const toCsvLine = (row: ReturnType<typeof toRow>) =>
     row.requestIp,
     row.visitorId,
     row.browserName,
+    row.browserVersion,
     row.os,
+    row.osVersion,
+    row.deviceType,
+    row.deviceBrand,
+    row.deviceModel,
     row.city,
     row.countryCode,
     row.latitude,

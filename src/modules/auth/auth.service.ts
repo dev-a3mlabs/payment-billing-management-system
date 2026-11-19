@@ -180,7 +180,8 @@ const startSession = async (
         {
           userId: user.id,
           portal,
-          ...client,
+          ipAddress: client.ipAddress,
+          userAgent: client.userAgent,
           visitorId,
           expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000),
         },
@@ -240,9 +241,7 @@ const startSession = async (
 export const authService = {
   login: async ({ username, password, eventId, IdentityToken }: LoginInput, portal: Portal, client: ClientInfo) => {
 
-
     if (IdentityToken) {
-      
       const captcha = await cloudflareService.verifyTurnstile(IdentityToken);
 
       if (!captcha.ok) {

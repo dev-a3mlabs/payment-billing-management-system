@@ -29,6 +29,7 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.12.1",
+    "node-device-detector": "^2.2.9",
     "otpauth": "^9.6.0",
     "qrcode": "^1.5.4",
     "zod": "^4.6.7"

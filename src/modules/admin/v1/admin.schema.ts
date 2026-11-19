@@ -13,6 +13,10 @@ export const agentUuidParamsSchema = z.object({
   uuid: z.uuid('Agent UUID must be a valid UUID'),
 });
 
+export const agentSessionParamsSchema = agentUuidParamsSchema.extend({
+  sessionUuid: z.uuid('Session UUID must be a valid UUID'),
+});
+
 export const changeAgentStatusSchema = z.object({
   status: z.enum([UserStatus.active, UserStatus.inactive], {
     error: `Status must be one of: ${UserStatus.active}, ${UserStatus.inactive}`,

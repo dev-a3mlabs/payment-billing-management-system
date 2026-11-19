@@ -10,6 +10,7 @@ export const ACCESS_KEYS = {
   agentDelete: 'user.agent.delete',
   agentMax: 'user.agent.max',
   agentMfaReset: 'user.agent.mfa_reset',
+  agentSessionRevoke: 'user.agent.session_revoke',
   agentStatusChange: 'user.agent.status_change',
 } as const;
 
@@ -127,6 +128,17 @@ export const ACCESS_KEY_DEFINITIONS: AccessKeyDefinition[] = [
     key: ACCESS_KEYS.agentMfaReset,
     label: 'Reset agent MFA',
     description: 'Admin can reset MFA for their agents',
+    module: 'user',
+    kind: AccessKind.permission,
+    valueType: AccessValueType.bool,
+    defaultValue: 'false',
+    appliesTo: [Role.admin],
+    editableBy: [Role.super_admin],
+  },
+  {
+    key: ACCESS_KEYS.agentSessionRevoke,
+    label: 'Log out agent devices',
+    description: 'Admin can log out their agents from one device or all devices',
     module: 'user',
     kind: AccessKind.permission,
     valueType: AccessValueType.bool,

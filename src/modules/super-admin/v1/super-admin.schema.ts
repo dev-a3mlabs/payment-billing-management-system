@@ -38,6 +38,10 @@ export const userUuidParamsSchema = z.object({
   uuid: z.uuid('User UUID must be a valid UUID'),
 });
 
+export const userSessionParamsSchema = userUuidParamsSchema.extend({
+  sessionUuid: z.uuid('Session UUID must be a valid UUID'),
+});
+
 export const userPermissionParamsSchema = userUuidParamsSchema.extend({
   key: z.string().min(1, 'Permission key is required'),
 });

@@ -1,8 +1,10 @@
 import type { Request } from 'express';
+import type { DeviceInfo } from './device.js';
 
 export type ClientInfo = {
   ipAddress?: string;
   userAgent?: string;
+  device?: DeviceInfo;
 };
 
 export const getClientInfo = (req: Request): ClientInfo => ({

@@ -1,9 +1,25 @@
-import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
+import { ACTIVITY_ACTIONS } from '../../config/activity-actions.js';
+import { SESSION_REVOKE_REASONS, type SessionRevokeReason } from '../../config/session-revoke-reasons.js';
+import { withTransaction } from '../../db/transaction.js';
+import { ActivityStatus } from '../../generated/prisma/enums.js';
+import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import { ApiError } from '../../utils/ApiError.js';
+import type { ClientInfo } from '../../utils/request.js';
+import { activityLogService } from '../activity-log/activity-log.service.js';
 import { authRepository } from '../auth/auth.repository.js';
 import { SESSION_IDLE_MS, sessionRepository } from './session.repository.js';
 
-const NO_DEVICE_DETAILS = { browserName: null, os: null, city: null, countryCode: null };
+const NO_DEVICE_DETAILS = {
+  browserName: null,
+  browserVersion: null,
+  os: null,
+  osVersion: null,
+  deviceType: null,
+  deviceBrand: null,
+  deviceModel: null,
+  city: null,
+  countryCode: null,
+};
 
 export const sessionService = {
   isActive: (session: { revokedAt: Date | null; expiresAt: Date; lastActiveAt: Date }) =>
@@ -18,14 +34,46 @@ export const sessionService = {
       isCurrent: id === currentSessionId,
     })),
 
-  revokeOne: async (userId: number, uuid: string) => {
-    const { count } = await sessionRepository.revokeOne(userId, uuid, SESSION_REVOKE_REASONS.revokedByUser);
-    if (count === 0) {
-      throw ApiError.notFound('Session not found');
-    }
-  },
+  revokeOne: (userId: number, uuid: string, reason: SessionRevokeReason, actor: AuthUser, client: ClientInfo) =>
+    withTransaction(async (tx) => {
+      const { count } = await sessionRepository.revokeOne(userId, uuid, reason, tx);
+      if (count === 0) {
+        throw ApiError.notFound('Session not found');
+      }
 
-  revokeAll: (userId: number) => authRepository.revokeAllSessions(userId, SESSION_REVOKE_REASONS.revokedByAdmin),
+      await activityLogService.record(
+        {
+          action: ACTIVITY_ACTIONS.sessionRevoke,
+          status: ActivityStatus.success,
+          actorId: actor.id,
+          targetUserId: userId,
+          sessionId: actor.sessionId,
+          metadata: { sessionUuid: uuid, reason },
+        },
+        client,
+        tx,
+      );
+    }),
+
+  revokeAll: (userId: number, actor: AuthUser, client: ClientInfo) =>
+    withTransaction(async (tx) => {
+      const reason = SESSION_REVOKE_REASONS.revokedByAdmin;
+      const { count } = await authRepository.revokeAllSessions(userId, reason, tx);
+      if (count === 0) return;
+
+      await activityLogService.record(
+        {
+          action: ACTIVITY_ACTIONS.sessionRevokeAll,
+          status: ActivityStatus.success,
+          actorId: actor.id,
+          targetUserId: userId,
+          sessionId: actor.sessionId,
+          metadata: { count, reason },
+        },
+        client,
+        tx,
+      );
+    }),
 
   // Adds activeDevices to each user and drops the internal id, using one query for the whole list.
   withActiveDevices: async <T extends { id: number }>(users: T[]) => {

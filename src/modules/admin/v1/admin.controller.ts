@@ -55,9 +55,21 @@ export const adminController = {
 
   revokeAgentSessions: async (req: Request, res: Response) => {
     const { user } = req as AuthRequest;
-    await adminService.revokeAgentSessions(req.params.uuid as string, user);
+    await adminService.revokeAgentSessions(req.params.uuid as string, user, getClientInfo(req));
 
     sendSuccess(res, { message: 'Agent logged out from all devices successfully' });
+  },
+
+  revokeAgentSession: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    await adminService.revokeAgentSession(
+      req.params.uuid as string,
+      req.params.sessionUuid as string,
+      user,
+      getClientInfo(req),
+    );
+
+    sendSuccess(res, { message: 'Device logged out successfully' });
   },
 
   changeAgentStatus: async (req: Request, res: Response) => {

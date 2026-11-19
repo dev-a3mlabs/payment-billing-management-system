@@ -8,6 +8,8 @@ export const ACTIVITY_ACTIONS = {
   mfaEnable: 'auth.mfa.enable',
   mfaReset: 'auth.mfa.reset',
   mfaSetup: 'auth.mfa.setup',
+  sessionRevoke: 'auth.session.revoke',
+  sessionRevokeAll: 'auth.session.revoke_all',
   tokenReuseDetected: 'auth.token.reuse_detected',
   loginReportExport: 'report.login.export',
   securityAlertResolve: 'security.alert.resolve',

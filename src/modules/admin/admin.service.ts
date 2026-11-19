@@ -1,4 +1,5 @@
 import { ACCESS_KEYS } from '../../config/access-keys.js';
+import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
 import { withTransaction } from '../../db/transaction.js';
 import { Role, UserStatus } from '../../generated/prisma/enums.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
@@ -21,6 +22,13 @@ const findOwnAgent = async (uuid: string, admin: AuthUser) => {
     throw ApiError.notFound('Agent not found');
   }
   return agent;
+};
+
+const findAgentForSessionRevoke = async (uuid: string, admin: AuthUser) => {
+  if (!(await accessService.hasPermission(admin, ACCESS_KEYS.agentSessionRevoke))) {
+    throw ApiError.forbidden('You do not have permission to log out agent devices');
+  }
+  return findOwnAgent(uuid, admin);
 };
 
 // An admin can only change keys the super admin granted them, and only while the value isn't locked.
@@ -48,9 +56,17 @@ export const adminService = {
   getAgentSessions: async (agentUuid: string, admin: AuthUser) =>
     sessionService.list((await findOwnAgent(agentUuid, admin)).id),
 
-  revokeAgentSessions: async (agentUuid: string, admin: AuthUser) => {
-    await sessionService.revokeAll((await findOwnAgent(agentUuid, admin)).id);
-  },
+  revokeAgentSessions: async (agentUuid: string, admin: AuthUser, client: ClientInfo) =>
+    sessionService.revokeAll((await findAgentForSessionRevoke(agentUuid, admin)).id, admin, client),
+
+  revokeAgentSession: async (agentUuid: string, sessionUuid: string, admin: AuthUser, client: ClientInfo) =>
+    sessionService.revokeOne(
+      (await findAgentForSessionRevoke(agentUuid, admin)).id,
+      sessionUuid,
+      SESSION_REVOKE_REASONS.revokedByAdmin,
+      admin,
+      client,
+    ),
 
   updateAgentPermissions: async (
     agentUuid: string,

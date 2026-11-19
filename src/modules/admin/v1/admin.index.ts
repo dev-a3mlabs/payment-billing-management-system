@@ -10,7 +10,12 @@ import { securityAlertController } from '../../security-alert/v1/security-alert.
 import { securityAlertParamsSchema, securityAlertQuerySchema } from '../../security-alert/v1/security-alert.schema.js';
 import { adminController } from './admin.controller.js';
 import { listAgentsQuerySchema, updateUserPermissionsSchema } from '../../super-admin/v1/super-admin.schema.js';
-import { agentUuidParamsSchema, changeAgentStatusSchema, createAgentSchema } from './admin.schema.js';
+import {
+  agentSessionParamsSchema,
+  agentUuidParamsSchema,
+  changeAgentStatusSchema,
+  createAgentSchema,
+} from './admin.schema.js';
 import { requirePasswordChanged } from '../../../middlewares/require-password-changed.middleware.js';
 import { requireMfaSetup } from '../../../middlewares/require-mfa-setup.middleware.js';
 
@@ -41,6 +46,11 @@ router.put(
 );
 router.get('/agents/:uuid/sessions', validate({ params: agentUuidParamsSchema }), adminController.getAgentSessions);
 router.delete('/agents/:uuid/sessions', validate({ params: agentUuidParamsSchema }), adminController.revokeAgentSessions);
+router.delete(
+  '/agents/:uuid/sessions/:sessionUuid',
+  validate({ params: agentSessionParamsSchema }),
+  adminController.revokeAgentSession,
+);
 router.patch(
   '/agents/:uuid/status',
   validate({ params: agentUuidParamsSchema, body: changeAgentStatusSchema }),

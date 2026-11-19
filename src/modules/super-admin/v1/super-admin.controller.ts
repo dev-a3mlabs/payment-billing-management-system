@@ -106,9 +106,22 @@ export const superAdminController = {
   },
 
   revokeUserSessions: async (req: Request, res: Response) => {
-    await superAdminService.revokeUserSessions(req.params.uuid as string);
+    const { user } = req as AuthRequest;
+    await superAdminService.revokeUserSessions(req.params.uuid as string, user, getClientInfo(req));
 
     sendSuccess(res, { message: 'User logged out from all devices successfully' });
+  },
+
+  revokeUserSession: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    await superAdminService.revokeUserSession(
+      req.params.uuid as string,
+      req.params.sessionUuid as string,
+      user,
+      getClientInfo(req),
+    );
+
+    sendSuccess(res, { message: 'Device logged out successfully' });
   },
 
   unlockUser: async (req: Request, res: Response) => {

@@ -2,7 +2,7 @@ import { prisma } from '../../db/prisma.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import { LoginStatus } from '../../generated/prisma/enums.js';
 
-// browserDetails and ipInfo are large raw Fingerprint JSON, so reports never load them.
+// ipInfo is large raw Fingerprint JSON, so reports never load it.
 const REPORT_SELECT = {
   id: true,
   createdAt: true,
@@ -14,7 +14,12 @@ const REPORT_SELECT = {
   requestIp: true,
   visitorId: true,
   browserName: true,
+  browserVersion: true,
   os: true,
+  osVersion: true,
+  deviceType: true,
+  deviceBrand: true,
+  deviceModel: true,
   userAgent: true,
   city: true,
   countryCode: true,

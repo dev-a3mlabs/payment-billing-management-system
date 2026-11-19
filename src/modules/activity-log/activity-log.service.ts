@@ -18,5 +18,5 @@ type ActivityEntry = {
 
 export const activityLogService = {
   record: (entry: ActivityEntry, client: ClientInfo, tx?: TxClient) =>
-    activityLogRepository.create({ ...entry, ...client }, tx),
+    activityLogRepository.create({ ...entry, ipAddress: client.ipAddress, userAgent: client.userAgent }, tx),
 };

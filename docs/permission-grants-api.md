@@ -246,7 +246,7 @@ curl --location --request DELETE 'http://localhost:5000/api/v1/super-admin/users
 
 `GET /admin/permissions/me`
 
-Returns the logged-in admin's own values, set by the super admin. Use them to show or hide actions such as "Create agent" (`user.agent.create`), "Delete agent" (`user.agent.delete`), "Activate / Deactivate" (`user.agent.status_change`) and "Reset MFA" (`user.agent.mfa_reset`). Labels come from `GET /admin/permissions`, matched by `key`.
+Returns the logged-in admin's own values, set by the super admin. Use them to show or hide actions such as "Create agent" (`user.agent.create`), "Delete agent" (`user.agent.delete`), "Activate / Deactivate" (`user.agent.status_change`) and "Reset MFA" (`user.agent.mfa_reset`), and "Log out devices" (`user.agent.session_revoke`). Labels come from `GET /admin/permissions`, matched by `key`.
 
 ```bash
 curl --location 'http://localhost:5000/api/v1/admin/permissions/me' \
@@ -264,6 +264,7 @@ curl --location 'http://localhost:5000/api/v1/admin/permissions/me' \
     { "key": "user.agent.delete", "value": true, "source": "user", "locked": false },
     { "key": "user.agent.max", "value": 1, "source": "user", "locked": false },
     { "key": "user.agent.mfa_reset", "value": false, "source": "default", "locked": false },
+    { "key": "user.agent.session_revoke", "value": false, "source": "default", "locked": false },
     { "key": "user.agent.status_change", "value": true, "source": "user", "locked": false }
   ]
 }

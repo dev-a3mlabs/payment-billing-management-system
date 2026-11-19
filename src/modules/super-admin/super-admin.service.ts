@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { ERROR_CODES } from '../../config/error-codes.js';
+import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
 import { Role, UserStatus } from '../../generated/prisma/enums.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import { ApiError } from '../../utils/ApiError.js';
@@ -155,9 +156,17 @@ export const superAdminService = {
 
   getUserSessions: async (uuid: string) => sessionService.list((await findManagedUser(uuid)).id),
 
-  revokeUserSessions: async (uuid: string) => {
-    await sessionService.revokeAll((await findManagedUser(uuid)).id);
-  },
+  revokeUserSessions: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
+    sessionService.revokeAll((await findManagedUser(uuid)).id, superAdmin, client),
+
+  revokeUserSession: async (uuid: string, sessionUuid: string, superAdmin: AuthUser, client: ClientInfo) =>
+    sessionService.revokeOne(
+      (await findManagedUser(uuid)).id,
+      sessionUuid,
+      SESSION_REVOKE_REASONS.revokedByAdmin,
+      superAdmin,
+      client,
+    ),
 
   unlockUser: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
     userSecurityService.unlock((await findManagedUser(uuid)).id, superAdmin.id, client),

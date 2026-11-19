@@ -16,9 +16,9 @@ export const toLoginPlace = (event: FingerprintEvent | null) => {
 
 export type LoginPlace = ReturnType<typeof toLoginPlace>;
 
-// Request fields are always stored; Fingerprint fields only when the event was found.
+// Request and device fields are always stored; Fingerprint fields only when the event was found.
 export const toLoginEventData = (event: FingerprintEvent | null, client: ClientInfo) => {
-  const request = { requestIp: client.ipAddress, userAgent: client.userAgent };
+  const request = { requestIp: client.ipAddress, userAgent: client.userAgent, ...client.device };
   if (!event) return request;
 
   return {
@@ -26,9 +26,6 @@ export const toLoginEventData = (event: FingerprintEvent | null, client: ClientI
     ...toLoginPlace(event),
     eventId: event.event_id,
     fingerprintIp: event.ip_address,
-    os: event.os,
-    browserName: event.browser_details.browser_name,
-    browserDetails: event.browser_details,
     ipInfo: event.ip_info,
   };
 };

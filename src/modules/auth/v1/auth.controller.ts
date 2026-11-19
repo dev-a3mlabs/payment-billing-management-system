@@ -1,13 +1,14 @@
 import type { Request, Response } from 'express';
 import type { Portal } from '../../../config/portals.js';
 import type { AuthRequest } from '../../../middlewares/auth.middleware.js';
+import { detectDevice } from '../../../utils/device.js';
 import { getClientInfo } from '../../../utils/request.js';
 import { sendSuccess } from '../../../utils/response.js';
 import { authService } from '../auth.service.js';
 
 // Each portal's router mounts these through authRoutesFor(portal).
 export const loginFor = (portal: Portal) => async (req: Request, res: Response) => {
-  const data = await authService.login(req.body, portal, getClientInfo(req));
+  const data = await authService.login(req.body, portal, { ...getClientInfo(req), device: detectDevice(req) });
 
   if (data.mfaRequired) {
     return sendSuccess(res, { message: 'MFA code required', data });
@@ -16,7 +17,7 @@ export const loginFor = (portal: Portal) => async (req: Request, res: Response) 
 };
 
 export const loginMfaFor = (portal: Portal) => async (req: Request, res: Response) => {
-  const data = await authService.loginMfa(req.body, portal, getClientInfo(req));
+  const data = await authService.loginMfa(req.body, portal, { ...getClientInfo(req), device: detectDevice(req) });
 
   sendSuccess(res, { message: data.mustChangePassword ? 'Password change required' : 'Login successful', data });
 };

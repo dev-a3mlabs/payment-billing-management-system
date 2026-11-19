@@ -7,6 +7,9 @@ import routes from './routes.js';
 
 const app = express();
 
+// Requests through ngrok arrive from the local ngrok agent; trust only that hop for the real client IP.
+app.set('trust proxy', 'loopback');
+
 app.use(helmet());
 // app.use(cors());
 app.use(
