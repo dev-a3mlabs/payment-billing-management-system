@@ -1,13 +1,16 @@
 import { randomInt } from 'node:crypto';
+import { ACTIVITY_ACTIONS } from '../../config/activity-actions.js';
 import { ERROR_CODES } from '../../config/error-codes.js';
 import { SESSION_REVOKE_REASONS } from '../../config/session-revoke-reasons.js';
-import { Role, UserStatus } from '../../generated/prisma/enums.js';
+import { withTransaction } from '../../db/transaction.js';
+import { ActivityStatus, Role, UserStatus } from '../../generated/prisma/enums.js';
 import type { AuthUser } from '../../middlewares/auth.middleware.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { accessService } from '../access/access.service.js';
+import { activityLogService } from '../activity-log/activity-log.service.js';
 import { mfaService } from '../mfa/mfa.service.js';
 import { userRepository } from '../user/user.repository.js';
-import { userService } from '../user/user.service.js';
+import { changedFields, userService, type AccountChange } from '../user/user.service.js';
 import { sessionService } from '../session/session.service.js';
 import { userSecurityService } from '../user-security/user-security.service.js';
 import { superAdminRepository } from './super-admin.repository.js';
@@ -15,6 +18,7 @@ import type { ClientInfo } from '../../utils/request.js';
 import type {
   ChangeUserStatusInput,
   CreateUserInput,
+  UpdateAccountInput,
   UpdateUserGrantsInput,
   UpdateUserPermissionsInput,
 } from './v1/super-admin.schema.js';
@@ -178,4 +182,42 @@ export const superAdminService = {
 
   deleteUser: async (uuid: string, superAdmin: AuthUser, client: ClientInfo) =>
     userService.changeStatus(await findManagedUser(uuid), UserStatus.deleted, superAdmin.id, client),
+
+  // Keeps this device logged in and logs out the others.
+  updateAccount: async (input: UpdateAccountInput, superAdmin: AuthUser, client: ClientInfo) => {
+    await withTransaction(async (tx) => {
+      const account = await userRepository.findAccount(superAdmin.id, tx);
+
+      const change: AccountChange = {};
+      if (input.username !== undefined && input.username !== account.username) change.username = input.username;
+      if (input.email !== undefined && input.email !== account.email) change.email = input.email;
+      if (
+        input.countryCode !== undefined &&
+        input.mobileNumber !== undefined &&
+        (input.countryCode !== account.countryCode || input.mobileNumber !== account.mobileNumber)
+      ) {
+        change.countryCode = input.countryCode;
+        change.mobileNumber = input.mobileNumber;
+      }
+      if (Object.keys(change).length === 0) {
+        throw ApiError.badRequest('New value must be different from the current one');
+      }
+
+      await userService.assertAccountAvailable(change, tx);
+      await userService.applyAccountChange(account.id, change, tx, superAdmin.sessionId);
+
+      await activityLogService.record(
+        {
+          action: ACTIVITY_ACTIONS.accountChange,
+          status: ActivityStatus.success,
+          actorId: superAdmin.id,
+          targetUserId: superAdmin.id,
+          sessionId: superAdmin.sessionId,
+          metadata: { fields: changedFields(change) },
+        },
+        client,
+        tx,
+      );
+    });
+  },
 };

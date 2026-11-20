@@ -150,4 +150,11 @@ export const superAdminController = {
 
     sendSuccess(res, { message: 'User deleted successfully' });
   },
+
+  updateAccount: async (req: Request, res: Response) => {
+    const { user } = req as AuthRequest;
+    await superAdminService.updateAccount(req.body, user, getClientInfo(req));
+
+    sendSuccess(res, { message: 'Account updated successfully. Your other devices have been logged out.' });
+  },
 };

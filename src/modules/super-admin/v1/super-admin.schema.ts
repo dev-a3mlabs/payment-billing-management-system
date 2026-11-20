@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Role, UserStatus } from '../../../generated/prisma/enums.js';
 import { passwordSchema } from '../../auth/v1/auth.schema.js';
+import { countryCodeSchema, emailSchema, mobileNumberSchema } from '../../profile/v1/profile.schema.js';
 
 export const usernameSchema = z
   .string()
@@ -67,6 +68,20 @@ export const changeUserStatusSchema = z.object({
 });
 
 
+// The super admin's own username, email and mobile; there is no one above to approve a request.
+export const updateAccountSchema = z
+  .strictObject({
+    username: usernameSchema.optional(),
+    email: emailSchema.optional(),
+    countryCode: countryCodeSchema.optional(),
+    mobileNumber: mobileNumberSchema.optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' })
+  .refine((data) => ('countryCode' in data) === ('mobileNumber' in data), {
+    message: 'Country code and mobile number must be sent together',
+    path: ['mobileNumber'],
+  });
+
 export const listAgentsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
 });
@@ -76,3 +91,4 @@ export type UpdateUserPermissionsInput = z.infer<typeof updateUserPermissionsSch
 export type UpdateUserGrantsInput = z.infer<typeof updateUserGrantsSchema>;
 export type ChangeUserStatusInput = z.infer<typeof changeUserStatusSchema>;
 export type ListAgentsQuery = z.infer<typeof listAgentsQuerySchema>;
+export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;

@@ -39,4 +39,8 @@ export class ApiError extends Error {
   static conflict(message = 'Conflict', code: ErrorCode = ERROR_CODES.CONFLICT) {
     return new ApiError(409, message, code);
   }
+
+  static tooManyRequests(message = 'Too many requests', code: ErrorCode = ERROR_CODES.TOO_MANY_REQUESTS) {
+    return new ApiError(429, message, code);
+  }
 }

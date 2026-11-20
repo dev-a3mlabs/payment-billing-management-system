@@ -37,11 +37,11 @@ model User {
   countryCode  String? @map("country_code")
   mobileNumber String? @map("mobile_number")
 
-  createdById  Int?   @map("created_by_id")
-  createdBy    User?  @relation("UserCreatedBy", fields: [createdById], references: [id])
-  parentId Int?   @map("parent_id")
-  parent   User?  @relation("UserParent", fields: [parentId], references: [id])
-  children User[] @relation("UserParent")
+  createdById Int?   @map("created_by_id")
+  createdBy   User?  @relation("UserCreatedBy", fields: [createdById], references: [id])
+  parentId    Int?   @map("parent_id")
+  parent      User?  @relation("UserParent", fields: [parentId], references: [id])
+  children    User[] @relation("UserParent")
 
   createdUsers User[] @relation("UserCreatedBy")
 
@@ -65,6 +65,10 @@ model User {
   accessGrants      AccessGrant[]     @relation("AccessGrantUser")
   accessGrantsGiven AccessGrant[]     @relation("AccessGrantGrantedBy")
 
+  changeRequests        ChangeRequest[] @relation("ChangeRequestUser")
+  changeRequestsDecided ChangeRequest[] @relation("ChangeRequestDecidedBy")
+  notifications         Notification[]
+
   tempPasswordUsedAt DateTime? @map("temp_password_used_at")
   passwordChangedAt  DateTime? @map("password_changed_at")
   lastLoginAt        DateTime? @map("last_login_at")
@@ -76,7 +80,6 @@ model User {
   @@index([role])
   @@index([createdById])
   @@index([parentId])
-
   @@map("users")
 }
 
@@ -360,4 +363,49 @@ model ActivityLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("activity_logs")
+}
+
+enum ChangeRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+model ChangeRequest {
+  id           Int                 @id @default(autoincrement())
+  uuid         String              @unique @default(uuid())
+  userId       Int                 @map("user_id")
+  user         User                @relation("ChangeRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  field        String              @db.VarChar(20)
+  oldValue     Json                @map("old_value")
+  newValue     Json                @map("new_value")
+  status       ChangeRequestStatus @default(pending)
+  rejectReason String?             @map("reject_reason") @db.VarChar(500)
+  decidedById  Int?                @map("decided_by_id")
+  decidedBy    User?               @relation("ChangeRequestDecidedBy", fields: [decidedById], references: [id])
+  decidedAt    DateTime?           @map("decided_at")
+  expiresAt    DateTime            @map("expires_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([decidedById])
+  @@map("change_requests")
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String    @db.VarChar(50)
+  entityId  String?   @map("entity_id") @db.VarChar(64)
+  metadata  Json?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, readAt])
+  @@index([userId, id])
+  @@map("notifications")
 }

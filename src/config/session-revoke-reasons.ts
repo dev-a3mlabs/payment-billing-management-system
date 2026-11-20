@@ -10,6 +10,7 @@ export const SESSION_REVOKE_REASONS = {
   revokedByAdmin: 'revoked_by_admin',
   mfaEnabled: 'mfa_enabled',
   mfaReset: 'mfa_reset',
+  accountChanged: 'account_changed',
 } as const;
 
 export type SessionRevokeReason = (typeof SESSION_REVOKE_REASONS)[keyof typeof SESSION_REVOKE_REASONS];

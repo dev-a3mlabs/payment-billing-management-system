@@ -7,6 +7,7 @@ import { ApiError } from '../../utils/ApiError.js';
 import type { ClientInfo } from '../../utils/request.js';
 import { activityLogService } from '../activity-log/activity-log.service.js';
 import { authRepository } from '../auth/auth.repository.js';
+import { userService } from '../user/user.service.js';
 import { SESSION_IDLE_MS, sessionRepository } from './session.repository.js';
 
 const ACTIVITY_SAVE_INTERVAL_MS = 60 * 1000;
@@ -28,6 +29,12 @@ export const sessionService = {
     !session.revokedAt &&
     session.expiresAt > new Date() &&
     Date.now() - session.lastActiveAt.getTime() < SESSION_IDLE_MS,
+
+  // For long-lived requests (notification streams) that must stop when the session ends.
+  isStillValid: async (sessionId: number) => {
+    const session = await sessionRepository.findWithUser(sessionId);
+    return session !== null && sessionService.isActive(session) && userService.isActive(session.user);
+  },
 
   // Saves at most once a minute, so most requests don't write to the DB.
   markActive: async (session: { id: number; lastActiveAt: Date }) => {

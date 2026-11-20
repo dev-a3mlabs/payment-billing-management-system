@@ -3,6 +3,8 @@ import { Portal } from '../../../config/portals.js';
 import { authenticate } from '../../../middlewares/auth.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { authRoutesFor } from '../../auth/v1/auth.index.js';
+import { ownChangeRequestRoutes, reviewChangeRequestRoutes } from '../../change-request/v1/change-request.index.js';
+import notificationRoutes from '../../notification/v1/notification.index.js';
 import { loginReportController } from '../../login-report/v1/login-report.controller.js';
 import { loginReportQuerySchema } from '../../login-report/v1/login-report.schema.js';
 import { profileRoutesFor } from '../../profile/v1/profile.index.js';
@@ -66,6 +68,9 @@ router.patch(
   validate({ params: securityAlertParamsSchema }),
   securityAlertController.resolve,
 );
+router.use('/profile/change-requests', ownChangeRequestRoutes);
+router.use('/change-requests', reviewChangeRequestRoutes);
+router.use('/notifications', notificationRoutes);
 router.get('/agents/:uuid/mfa', validate({ params: agentUuidParamsSchema }), adminController.getAgentMfa);
 router.delete('/agents/:uuid/mfa', validate({ params: agentUuidParamsSchema }), adminController.resetAgentMfa);
 

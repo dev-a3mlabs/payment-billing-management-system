@@ -4,6 +4,8 @@ import { authenticate } from '../../../middlewares/auth.middleware.js';
 import { requireMfaSetup } from '../../../middlewares/require-mfa-setup.middleware.js';
 import { validate } from '../../../middlewares/validate.middleware.js';
 import { authRoutesFor } from '../../auth/v1/auth.index.js';
+import { reviewChangeRequestRoutes } from '../../change-request/v1/change-request.index.js';
+import notificationRoutes from '../../notification/v1/notification.index.js';
 import { loginReportController } from '../../login-report/v1/login-report.controller.js';
 import { loginReportQuerySchema } from '../../login-report/v1/login-report.schema.js';
 import { profileRoutesFor } from '../../profile/v1/profile.index.js';
@@ -15,6 +17,7 @@ import {
   checkUsernameSchema,
   createUserSchema,
   listAgentsQuerySchema,
+  updateAccountSchema,
   updateUserGrantsSchema,
   updateUserPermissionsSchema,
   userPermissionParamsSchema,
@@ -83,6 +86,9 @@ router.patch(
   validate({ params: securityAlertParamsSchema }),
   securityAlertController.resolve,
 );
+router.patch('/profile/account', validate({ body: updateAccountSchema }), superAdminController.updateAccount);
+router.use('/change-requests', reviewChangeRequestRoutes);
+router.use('/notifications', notificationRoutes);
 router.get('/users/:uuid/mfa', validate({ params: userUuidParamsSchema }), superAdminController.getUserMfa);
 router.delete('/users/:uuid/mfa', validate({ params: userUuidParamsSchema }), superAdminController.resetUserMfa);
 router.delete('/users/:uuid', validate({ params: userUuidParamsSchema }), superAdminController.deleteUser);

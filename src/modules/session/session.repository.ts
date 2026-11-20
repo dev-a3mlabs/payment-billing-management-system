@@ -13,6 +13,17 @@ const activeWhere = () => ({
 });
 
 export const sessionRepository = {
+  findWithUser: (id: number) =>
+    prisma.userSession.findUnique({
+      where: { id },
+      select: {
+        revokedAt: true,
+        expiresAt: true,
+        lastActiveAt: true,
+        user: { select: { status: true, parent: { select: { status: true } } } },
+      },
+    }),
+
   findActive: (userId: number) =>
     prisma.userSession.findMany({
       where: { userId, ...activeWhere() },

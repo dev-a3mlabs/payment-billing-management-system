@@ -6,6 +6,40 @@ export const userRepository = {
   isUsernameTaken: async (username: string, tx: TxClient = prisma) =>
     (await tx.user.findUnique({ where: { username }, select: { id: true } })) !== null,
 
+  isEmailTaken: async (email: string, tx: TxClient = prisma) =>
+    (await tx.user.findUnique({ where: { email }, select: { id: true } })) !== null,
+
+  isMobileTaken: async (countryCode: string, mobileNumber: string, tx: TxClient = prisma) =>
+    (await tx.user.findUnique({
+      where: { countryCode_mobileNumber: { countryCode, mobileNumber } },
+      select: { id: true },
+    })) !== null,
+
+  findIdsByRole: async (role: Role, tx: TxClient = prisma) =>
+    (await tx.user.findMany({ where: { role, status: UserStatus.active }, select: { id: true } })).map(({ id }) => id),
+
+  findAccount: (id: number, tx: TxClient = prisma) =>
+    tx.user.findUniqueOrThrow({
+      where: { id },
+      select: {
+        id: true,
+        role: true,
+        status: true,
+        parentId: true,
+        username: true,
+        email: true,
+        countryCode: true,
+        mobileNumber: true,
+        parent: { select: { status: true } },
+      },
+    }),
+
+  updateAccount: (
+    id: number,
+    data: { username?: string; email?: string; countryCode?: string; mobileNumber?: string },
+    tx: TxClient = prisma,
+  ) => tx.user.update({ where: { id }, data, select: { id: true } }),
+
   findByUuid: (uuid: string) =>
     prisma.user.findUnique({ where: { uuid }, select: { id: true, role: true, status: true, parentId: true } }),
 

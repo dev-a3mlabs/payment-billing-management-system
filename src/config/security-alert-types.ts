@@ -1,4 +1,5 @@
 export const SECURITY_ALERT_TYPES = {
+  accountChanged: 'account_changed',
   failedLoginSpike: 'failed_login_spike',
   impossibleTravel: 'impossible_travel',
   newDevice: 'new_device',
