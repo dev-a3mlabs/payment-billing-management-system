@@ -14,6 +14,7 @@ app.use(helmet());
 // app.use(cors());
 app.use(
   cors({
+    origin: '*',
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Authorization", "Content-Type", "Accept", "ngrok-skip-browser-warning"],
   }),
