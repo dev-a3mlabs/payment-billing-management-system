@@ -2,13 +2,14 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { env } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware.js';
 import routes from './routes.js';
 
 const app = express();
 
-// Requests through ngrok arrive from the local ngrok agent; trust only that hop for the real client IP.
-app.set('trust proxy', 'loopback');
+// Trust only our own proxy (Railway, or ngrok locally) for the real client IP; never every X-Forwarded-For entry.
+app.set('trust proxy', env.TRUST_PROXY);
 
 app.use(helmet());
 // app.use(cors());

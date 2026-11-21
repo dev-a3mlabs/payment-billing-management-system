@@ -9,6 +9,11 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   SESSION_MAX_HOURS: z.coerce.number().int().positive().default(12),
+  // A hop count (Railway: 1) or an Express preset such as 'loopback' (local, ngrok).
+  TRUST_PROXY: z
+    .string()
+    .default('loopback')
+    .transform((value) => (/^\d+$/.test(value) ? Number(value) : value)),
   FINGERPRINT_SECRET_API_KEY: z.string().min(1, 'FINGERPRINT_SECRET_API_KEY is required'),
   FINGERPRINT_REGION: z.enum(['global', 'eu', 'ap']).default('global'),
   CLOUDFLARE_SECRET_API_KEY: z.string().min(1, 'CLOUDFLARE_SECRET_API_KEY is required'),
